@@ -1,0 +1,54 @@
+language:
+  summary_language: ur
+
+ocr:
+  provider: google_cloud_vision
+  language_hints: [ur, en]
+  page_image_dpi: 300
+  low_confidence_threshold: 0.8
+
+pipeline:
+  correction_provider: gemini
+  summarisers: [claude, gpt, gemini, deepseek]
+  consolidator: claude
+  min_summaries: 2
+
+providers:
+  claude:
+    type: anthropic
+    model: claude-sonnet-4-6
+    api_key_env: ANTHROPIC_API_KEY
+    max_output_tokens: 4096
+  gpt:
+    type: openai
+    model: gpt-5.4
+    api_key_env: OPENAI_API_KEY
+    max_output_tokens: 4096
+  gemini:
+    type: gemini
+    model: gemini-3-pro-preview
+    api_key_env: GEMINI_API_KEY
+    max_output_tokens: 4096
+  deepseek:
+    type: deepseek
+    model: deepseek-v4-flash
+    api_key_env: DEEPSEEK_API_KEY
+    base_url: https://api.deepseek.com
+    max_output_tokens: 4096
+
+prompts:
+  correction: prompts/correction.prompt.txt
+  summarise: prompts/summarise.prompt.txt
+  consolidate: prompts/consolidate.prompt.txt
+
+output:
+  format_spec: templates/output_format.yaml
+  font: "Noto Nastaliq Urdu"
+  direction: rtl
+  destination: ./runs/
+
+runtime:
+  concurrency: 4
+  request_timeout_seconds: 120
+  retries: 3
+  retry_initial_delay_seconds: 1

@@ -1,0 +1,12 @@
+Summarise the following document in {{summary_language}}.
+
+Requirements:
+- Write in clear, formal Urdu.
+- Preserve the document's main argument, facts, dates, names, figures, and decisions.
+- Use concise paragraphs rather than bullet points unless the source is list-heavy.
+- Do not add facts that are not present in the document.
+- If the document has uncertainty or conflicting statements, mention that carefully.
+- Return only the summary text.
+
+Document:
+{{document}}

@@ -1,0 +1,12 @@
+Consolidate the following independent provider summaries into one final summary in {{summary_language}}.
+
+Requirements:
+- Write in clear, formal Urdu.
+- Include points that are consistently supported by the summaries.
+- Prefer the most specific shared facts, names, dates, numbers, and decisions.
+- If summaries disagree, use cautious wording and do not invent a resolution.
+- Remove duplication and provider-specific wording.
+- Return only the final summary text.
+
+Summaries:
+{{summaries}}
