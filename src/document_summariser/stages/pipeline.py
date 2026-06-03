@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import perf_counter
 
 from document_summariser.prompts import load_prompt
+from document_summariser.providers.base import ProviderAdapter
 from document_summariser.stages.context import RunContext
 
 
@@ -53,9 +54,16 @@ class Pipeline:
     def _correct(self, context: RunContext) -> None:
         prompt = load_prompt(context.config.prompts["correction"])
         provider = context.providers[context.config.correction_provider]
+        attachments = self._attachments_for_provider(provider, context.ocr_page_images)
+        if context.ocr_page_images:
+            context.manifest["correction_attachments"] = {
+                "available": len(context.ocr_page_images),
+                "sent": len(attachments or []),
+                "provider_supports_attachments": bool(getattr(provider, "supports_attachments", False)),
+            }
         corrected = provider.generate(
             prompt.render(ocr_text=context.ocr_text),
-            attachments=context.ocr_page_images or None,
+            attachments=attachments,
         )
         context.corrected_text = corrected
         context.artifacts.write_text("02_corrected.txt", corrected)
@@ -63,6 +71,15 @@ class Pipeline:
             "path": str(prompt.path),
             "sha256": prompt.sha256,
         }
+
+    def _attachments_for_provider(self, provider: ProviderAdapter, page_images: list[str]) -> list[str] | None:
+        if not page_images:
+            return None
+
+        supports_attachments = bool(getattr(provider, "supports_attachments", False))
+        if not supports_attachments:
+            return None
+        return page_images
 
     def _summarise(self, context: RunContext) -> None:
         prompt = load_prompt(context.config.prompts["summarise"])

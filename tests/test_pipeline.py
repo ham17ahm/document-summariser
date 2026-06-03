@@ -71,7 +71,7 @@ def test_pipeline_passes_ocr_page_images_to_correction_provider(tmp_path):
     config = load_config(_write_order_config(tmp_path))
     artifacts = ArtifactStore(tmp_path / "run")
     image_path = artifacts.write_bytes("page_images/page_0001.png", b"png")
-    corrector = RecordingProvider("corrector", "test-model")
+    corrector = RecordingProvider("corrector", "test-model", supports_attachments=True)
 
     context = RunContext(
         input_pdf=pdf,
@@ -92,11 +92,50 @@ def test_pipeline_passes_ocr_page_images_to_correction_provider(tmp_path):
     assert corrector.last_attachments == [str(image_path)]
 
 
+def test_pipeline_skips_ocr_page_images_for_text_only_correction_provider(tmp_path):
+    pdf = tmp_path / "sample.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n% placeholder\n")
+    config = load_config(_write_order_config(tmp_path))
+    artifacts = ArtifactStore(tmp_path / "run")
+    image_path = artifacts.write_bytes("page_images/page_0001.png", b"png")
+    corrector = RecordingProvider("corrector", "test-model", supports_attachments=False)
+
+    context = RunContext(
+        input_pdf=pdf,
+        config=config,
+        artifacts=artifacts,
+        ocr=StaticOcrAdapter(str(image_path)),
+        providers={
+            "corrector": corrector,
+            "slow": StaticProvider("slow", "test-model", "slow summary"),
+            "fast": StaticProvider("fast", "test-model", "fast summary"),
+            "consolidator": StaticProvider("consolidator", "test-model", "final summary"),
+        },
+        manifest={"input_file": str(pdf), "config_file": str(config.source_path)},
+    )
+
+    Pipeline().run(context)
+
+    assert corrector.last_attachments is None
+    assert context.manifest["correction_attachments"] == {
+        "available": 1,
+        "sent": 0,
+        "provider_supports_attachments": False,
+    }
+
+
 class StaticProvider:
-    def __init__(self, provider_id: str, model: str, response: str) -> None:
+    def __init__(
+        self,
+        provider_id: str,
+        model: str,
+        response: str,
+        supports_attachments: bool = False,
+    ) -> None:
         self.id = provider_id
         self.model = model
         self.response = response
+        self.supports_attachments = supports_attachments
 
     def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
         return self.response
@@ -113,8 +152,8 @@ class DelayedProvider(StaticProvider):
 
 
 class RecordingProvider(StaticProvider):
-    def __init__(self, provider_id: str, model: str) -> None:
-        super().__init__(provider_id, model, "final summary")
+    def __init__(self, provider_id: str, model: str, supports_attachments: bool = False) -> None:
+        super().__init__(provider_id, model, "final summary", supports_attachments=supports_attachments)
         self.last_prompt = ""
         self.last_attachments = None
 

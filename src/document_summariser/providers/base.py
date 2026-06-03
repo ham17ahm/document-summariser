@@ -11,6 +11,7 @@ from document_summariser.config import ProviderConfig
 class ProviderAdapter(Protocol):
     id: str
     model: str
+    supports_attachments: bool
 
     def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
         ...
@@ -20,6 +21,7 @@ class ProviderAdapter(Protocol):
 class MockProvider:
     id: str
     model: str
+    supports_attachments: bool = True
 
     def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
         excerpt = " ".join(prompt.split())[:600]
@@ -43,6 +45,7 @@ class BaseCloudProvider:
     config: ProviderConfig
     timeout_seconds: float
     retry_policy: RetryPolicy
+    supports_attachments: bool = False
 
     def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
         if attachments:
@@ -132,6 +135,8 @@ class OpenAICompatibleProvider(BaseCloudProvider):
 
 @dataclass
 class GeminiProvider(BaseCloudProvider):
+    supports_attachments: bool = True
+
     def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
         return self._generate_with_retry(prompt, attachments)
 
@@ -222,6 +227,7 @@ class UnsupportedProvider:
     id: str
     model: str
     provider_type: str
+    supports_attachments: bool = False
 
     def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
         raise ProviderError(f"Unsupported provider type {self.provider_type!r} for {self.id!r}.")

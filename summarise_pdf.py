@@ -5,14 +5,10 @@ import os
 import sys
 from pathlib import Path
 
-from document_summariser.artifacts import ArtifactStore
+from document_summariser.application import run_document_summary
 from document_summariser.cli import copy_final_text
-from document_summariser.config import load_config, preferred_config_path
+from document_summariser.config import preferred_config_path
 from document_summariser.env import load_local_env
-from document_summariser.ocr import build_ocr_adapter
-from document_summariser.providers.registry import build_provider_registry
-from document_summariser.stages import Pipeline
-from document_summariser.stages.context import RunContext
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -31,33 +27,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     load_local_env()
     args = build_parser().parse_args(argv)
-    input_pdf = Path(args.pdf).resolve()
-    config = load_config(args.config)
-    artifacts = ArtifactStore.create(
-        os.environ.get("DOCUMENT_SUMMARISER_OUTPUT_DIR") or config.output.get("destination", "./runs/"),
-        input_pdf,
-    )
-
-    context = RunContext(
-        input_pdf=input_pdf,
-        config=config,
-        artifacts=artifacts,
-        ocr=build_ocr_adapter(config),
-        providers=build_provider_registry(config),
-        manifest={
-            "input_file": str(input_pdf),
-            "config_file": str(config.source_path),
-            "ocr_provider": config.ocr.get("provider"),
-            "providers": {
-                provider_id: {"type": provider.type, "model": provider.model}
-                for provider_id, provider in config.providers.items()
-            },
-        },
-    )
-
-    Pipeline().run(context)
-    final_output_dir = Path(config.output.get("final_text_directory", input_pdf.parent)).expanduser()
-    final_path = copy_final_text(artifacts.root / "05_output.txt", final_output_dir / input_pdf.with_suffix(".txt").name)
+    result = run_document_summary(args.pdf, config_path=args.config)
+    final_output_dir = Path(result.config.output.get("final_text_directory", result.input_pdf.parent)).expanduser()
+    final_path = copy_final_text(result.output_text_path, final_output_dir / result.input_pdf.with_suffix(".txt").name)
     print(final_path)
     return 0
 

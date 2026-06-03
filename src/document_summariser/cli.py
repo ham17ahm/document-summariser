@@ -5,13 +5,9 @@ import shutil
 import os
 from pathlib import Path
 
-from document_summariser.artifacts import ArtifactStore
-from document_summariser.config import load_config, preferred_config_path
+from document_summariser.application import run_document_summary
+from document_summariser.config import preferred_config_path
 from document_summariser.env import load_local_env
-from document_summariser.ocr import build_ocr_adapter
-from document_summariser.providers.registry import build_provider_registry
-from document_summariser.stages import Pipeline
-from document_summariser.stages.context import RunContext
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -34,34 +30,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     load_local_env()
     args = build_parser().parse_args(argv)
-    config = load_config(args.config)
-    input_pdf = Path(args.pdf).resolve()
-    destination = args.out or os.environ.get("DOCUMENT_SUMMARISER_OUTPUT_DIR") or config.output.get("destination", "./runs/")
-    artifacts = ArtifactStore.create(destination, input_pdf)
-    ocr = build_ocr_adapter(config)
-    providers = build_provider_registry(config)
-
-    context = RunContext(
-        input_pdf=input_pdf,
-        config=config,
-        artifacts=artifacts,
-        ocr=ocr,
-        providers=providers,
-        manifest={
-            "input_file": str(input_pdf),
-            "config_file": str(config.source_path),
-            "ocr_provider": config.ocr.get("provider"),
-            "providers": {
-                provider_id: {"type": provider.type, "model": provider.model}
-                for provider_id, provider in config.providers.items()
-            },
-        },
-    )
-    Pipeline().run(context)
+    result = run_document_summary(args.pdf, config_path=args.config, output_dir=args.out)
     if args.final_text:
-        final_text = copy_final_text(artifacts.root / "05_output.txt", Path(args.final_text))
+        final_text = copy_final_text(result.output_text_path, Path(args.final_text))
         print(f"Wrote final TXT to {final_text}")
-    print(f"Wrote run artifacts to {artifacts.root}")
+    print(f"Wrote run artifacts to {result.artifacts.root}")
     return 0
 
 
