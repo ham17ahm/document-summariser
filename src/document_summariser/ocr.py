@@ -6,6 +6,7 @@ from typing import Any, Protocol
 
 from document_summariser.artifacts import ArtifactStore
 from document_summariser.config import AppConfig
+from document_summariser.errors import InputFileError, OcrError
 
 
 class OcrAdapter(Protocol):
@@ -35,10 +36,6 @@ class OcrResult:
         return {"provider": self.provider, "pages": [asdict(page) for page in self.pages]}
 
 
-class OcrError(RuntimeError):
-    pass
-
-
 @dataclass
 class MockOcrAdapter:
     provider_name: str = "mock"
@@ -66,17 +63,42 @@ class GoogleCloudVisionOcrAdapter:
         try:
             from google.cloud import vision
         except ModuleNotFoundError as exc:
-            raise OcrError("Install the 'google-cloud-vision' package to use Google Cloud Vision OCR.") from exc
+            raise OcrError(
+                "Install the 'google-cloud-vision' package to use Google Cloud Vision OCR.",
+                details={"provider": "google_cloud_vision"},
+                cause=exc,
+            ) from exc
 
-        client = vision.ImageAnnotatorClient()
+        try:
+            client = vision.ImageAnnotatorClient()
+        except Exception as exc:  # noqa: BLE001 - Google auth/client errors vary by environment
+            raise OcrError(
+                "Could not initialise Google Cloud Vision OCR client.",
+                details={"provider": "google_cloud_vision"},
+                cause=exc,
+            ) from exc
         pages: list[OcrPage] = []
         for page_number, image_bytes in enumerate(_render_pdf_pages(pdf_path, self.page_image_dpi), start=1):
             image_path = artifacts.write_bytes(f"page_images/page_{page_number:04d}.png", image_bytes)
             image = vision.Image(content=image_bytes)
             image_context = {"language_hints": self.language_hints} if self.language_hints else None
-            response = client.document_text_detection(image=image, image_context=image_context)
+            try:
+                response = client.document_text_detection(image=image, image_context=image_context)
+            except Exception as exc:  # noqa: BLE001 - Google API exceptions are SDK-specific
+                raise OcrError(
+                    f"Google Cloud Vision OCR request failed on page {page_number}.",
+                    details={
+                        "provider": "google_cloud_vision",
+                        "page": page_number,
+                        "language_hints": self.language_hints,
+                    },
+                    cause=exc,
+                ) from exc
             if response.error.message:
-                raise OcrError(f"Google Cloud Vision failed on page {page_number}: {response.error.message}")
+                raise OcrError(
+                    f"Google Cloud Vision failed on page {page_number}: {response.error.message}",
+                    details={"provider": "google_cloud_vision", "page": page_number},
+                )
 
             text = response.full_text_annotation.text or ""
             confidence = _average_word_confidence(response.full_text_annotation)
@@ -92,7 +114,7 @@ class GoogleCloudVisionOcrAdapter:
             )
 
         if not pages:
-            raise OcrError("PDF did not contain any pages.")
+            raise OcrError("PDF did not contain any pages.", details={"input_file": str(pdf_path)})
         return OcrResult(provider="google_cloud_vision", pages=pages)
 
 
@@ -101,7 +123,7 @@ def build_ocr_adapter(config: AppConfig) -> OcrAdapter:
     if provider == "mock":
         return MockOcrAdapter(provider_name=provider)
     if provider != "google_cloud_vision":
-        raise OcrError(f"Unsupported OCR provider {provider!r}.")
+        raise OcrError(f"Unsupported OCR provider {provider!r}.", details={"provider": provider})
 
     return GoogleCloudVisionOcrAdapter(
         language_hints=[str(item) for item in config.ocr.get("language_hints", [])],
@@ -112,29 +134,51 @@ def build_ocr_adapter(config: AppConfig) -> OcrAdapter:
 
 def validate_pdf(path: Path) -> None:
     if not path.exists():
-        raise ValueError(f"Input file does not exist: {path}")
+        raise InputFileError(f"Input file does not exist: {path}", details={"input_file": str(path)})
     if not path.is_file():
-        raise ValueError(f"Input path is not a file: {path}")
+        raise InputFileError(f"Input path is not a file: {path}", details={"input_file": str(path)})
     if path.suffix.lower() != ".pdf":
-        raise ValueError("Input must be a PDF file.")
-    with path.open("rb") as handle:
-        if handle.read(5) != b"%PDF-":
-            raise ValueError("Input does not appear to be a readable PDF.")
+        raise InputFileError("Input must be a PDF file.", details={"input_file": str(path)})
+    try:
+        with path.open("rb") as handle:
+            if handle.read(5) != b"%PDF-":
+                raise InputFileError(
+                    "Input does not appear to be a readable PDF.",
+                    details={"input_file": str(path)},
+                )
+    except InputFileError:
+        raise
+    except OSError as exc:
+        raise InputFileError(
+            "Could not read input PDF.",
+            details={"input_file": str(path)},
+        ) from exc
 
 
 def _render_pdf_pages(pdf_path: Path, dpi: int) -> list[bytes]:
     try:
         import fitz
     except ModuleNotFoundError as exc:
-        raise OcrError("Install the 'PyMuPDF' package to render PDF pages for OCR.") from exc
+        raise OcrError(
+            "Install the 'PyMuPDF' package to render PDF pages for OCR.",
+            details={"input_file": str(pdf_path), "dpi": dpi},
+            cause=exc,
+        ) from exc
 
     images: list[bytes] = []
     zoom = dpi / 72
     matrix = fitz.Matrix(zoom, zoom)
-    with fitz.open(pdf_path) as document:
-        for page in document:
-            pixmap = page.get_pixmap(matrix=matrix, alpha=False)
-            images.append(pixmap.tobytes("png"))
+    try:
+        with fitz.open(pdf_path) as document:
+            for page in document:
+                pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+                images.append(pixmap.tobytes("png"))
+    except Exception as exc:  # noqa: BLE001 - PyMuPDF can raise several document/render exceptions
+        raise OcrError(
+            "Could not render PDF pages for OCR.",
+            details={"input_file": str(pdf_path), "dpi": dpi},
+            cause=exc,
+        ) from exc
     return images
 
 

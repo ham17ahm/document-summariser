@@ -6,6 +6,7 @@ from time import sleep
 from typing import Protocol
 
 from document_summariser.config import ProviderConfig
+from document_summariser.errors import ProviderError
 
 
 class ProviderAdapter(Protocol):
@@ -34,10 +35,6 @@ class RetryPolicy:
     initial_delay_seconds: float
 
 
-class ProviderError(RuntimeError):
-    pass
-
-
 @dataclass
 class BaseCloudProvider:
     id: str
@@ -49,14 +46,20 @@ class BaseCloudProvider:
 
     def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
         if attachments:
-            raise ProviderError(f"{self.id} does not support attachments in this pipeline.")
+            raise ProviderError(
+                f"{self.id} does not support attachments in this pipeline.",
+                details=self._error_details(attachment_count=len(attachments)),
+            )
 
         last_error: Exception | None = None
         for attempt in range(1, self.retry_policy.attempts + 1):
             try:
                 text = self._generate_once(prompt)
                 if not text.strip():
-                    raise ProviderError(f"{self.id} returned an empty response.")
+                    raise ProviderError(
+                        f"{self.id} returned an empty response.",
+                        details=self._error_details(attempt=attempt),
+                    )
                 return text
             except Exception as exc:  # noqa: BLE001 - provider SDKs expose different exception classes
                 last_error = exc
@@ -64,7 +67,11 @@ class BaseCloudProvider:
                     break
                 sleep(self.retry_policy.initial_delay_seconds * (2 ** (attempt - 1)))
 
-        raise ProviderError(f"{self.id} failed after {self.retry_policy.attempts} attempts: {last_error}") from last_error
+        raise ProviderError(
+            f"{self.id} failed after {self.retry_policy.attempts} attempts: {last_error}",
+            details=self._error_details(attempts=self.retry_policy.attempts),
+            cause=last_error,
+        ) from last_error
 
     def _generate_once(self, prompt: str) -> str:
         raise NotImplementedError
@@ -72,11 +79,26 @@ class BaseCloudProvider:
     def _api_key(self) -> str:
         env_name = self.config.api_key_env
         if not env_name:
-            raise ProviderError(f"Provider {self.id!r} is missing api_key_env in config.")
+            raise ProviderError(
+                f"Provider {self.id!r} is missing api_key_env in config.",
+                details=self._error_details(),
+            )
         value = os.environ.get(env_name)
         if not value:
-            raise ProviderError(f"Missing API key for provider {self.id!r}. Set {env_name}.")
+            raise ProviderError(
+                f"Missing API key for provider {self.id!r}. Set {env_name}.",
+                details=self._error_details(api_key_env=env_name),
+            )
         return value
+
+    def _error_details(self, **extra: object) -> dict[str, object]:
+        details: dict[str, object] = {
+            "provider": self.id,
+            "provider_type": self.config.type,
+            "model": self.model,
+        }
+        details.update(extra)
+        return details
 
 
 @dataclass
@@ -85,7 +107,11 @@ class AnthropicProvider(BaseCloudProvider):
         try:
             from anthropic import Anthropic
         except ModuleNotFoundError as exc:
-            raise ProviderError("Install the 'anthropic' package to use Anthropic providers.") from exc
+            raise ProviderError(
+                "Install the 'anthropic' package to use Anthropic providers.",
+                details=self._error_details(),
+                cause=exc,
+            ) from exc
 
         client = Anthropic(api_key=self._api_key(), timeout=self.timeout_seconds)
         kwargs = {
@@ -112,7 +138,11 @@ class OpenAICompatibleProvider(BaseCloudProvider):
         try:
             from openai import OpenAI
         except ModuleNotFoundError as exc:
-            raise ProviderError("Install the 'openai' package to use OpenAI-compatible providers.") from exc
+            raise ProviderError(
+                "Install the 'openai' package to use OpenAI-compatible providers.",
+                details=self._error_details(),
+                cause=exc,
+            ) from exc
 
         client_kwargs = {"api_key": self._api_key(), "timeout": self.timeout_seconds}
         if self.config.base_url:
@@ -146,7 +176,13 @@ class GeminiProvider(BaseCloudProvider):
             try:
                 text = self._generate_once(prompt, attachments)
                 if not text.strip():
-                    raise ProviderError(f"{self.id} returned an empty response.")
+                    raise ProviderError(
+                        f"{self.id} returned an empty response.",
+                        details=self._error_details(
+                            attempt=attempt,
+                            attachment_count=len(attachments or []),
+                        ),
+                    )
                 return text
             except Exception as exc:  # noqa: BLE001 - provider SDKs expose different exception classes
                 last_error = exc
@@ -154,14 +190,25 @@ class GeminiProvider(BaseCloudProvider):
                     break
                 sleep(self.retry_policy.initial_delay_seconds * (2 ** (attempt - 1)))
 
-        raise ProviderError(f"{self.id} failed after {self.retry_policy.attempts} attempts: {last_error}") from last_error
+        raise ProviderError(
+            f"{self.id} failed after {self.retry_policy.attempts} attempts: {last_error}",
+            details=self._error_details(
+                attempts=self.retry_policy.attempts,
+                attachment_count=len(attachments or []),
+            ),
+            cause=last_error,
+        ) from last_error
 
     def _generate_once(self, prompt: str, attachments: list[str] | None = None) -> str:
         try:
             from google import genai
             from google.genai import types
         except ModuleNotFoundError as exc:
-            raise ProviderError("Install the 'google-genai' package to use Gemini providers.") from exc
+            raise ProviderError(
+                "Install the 'google-genai' package to use Gemini providers.",
+                details=self._error_details(attachment_count=len(attachments or [])),
+                cause=exc,
+            ) from exc
 
         client = genai.Client(api_key=self._api_key())
         config_kwargs = {}
@@ -219,7 +266,8 @@ class GeminiProvider(BaseCloudProvider):
             diagnostics.append(f"finish_reasons={finish_reasons}")
         raise ProviderError(
             f"{self.id} returned no text"
-            + (f" ({'; '.join(diagnostics)})" if diagnostics else ".")
+            + (f" ({'; '.join(diagnostics)})" if diagnostics else "."),
+            details=self._error_details(attachment_count=len(attachments or [])),
         )
 
 
@@ -231,7 +279,10 @@ class UnsupportedProvider:
     supports_attachments: bool = False
 
     def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
-        raise ProviderError(f"Unsupported provider type {self.provider_type!r} for {self.id!r}.")
+        raise ProviderError(
+            f"Unsupported provider type {self.provider_type!r} for {self.id!r}.",
+            details={"provider": self.id, "provider_type": self.provider_type, "model": self.model},
+        )
 
 
 def _mime_type_for_path(path: str) -> str:

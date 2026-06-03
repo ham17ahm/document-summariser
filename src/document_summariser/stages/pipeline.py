@@ -3,6 +3,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import perf_counter
 
+from document_summariser.errors import PipelineStageError, exception_summary
 from document_summariser.prompts import load_prompt
 from document_summariser.providers.base import ProviderAdapter
 from document_summariser.stages.context import RunContext
@@ -31,13 +32,26 @@ class Pipeline:
                 "duration_seconds": round(perf_counter() - start, 3),
             }
         except Exception as exc:
+            manifest_path = context.artifacts.root / "manifest.json"
             context.manifest["stages"][name] = {
                 "status": "failed",
                 "duration_seconds": round(perf_counter() - start, 3),
-                "error": str(exc),
+                "error": exception_summary(exc),
             }
             context.artifacts.write_json("manifest.json", context.manifest)
-            raise
+            if isinstance(exc, PipelineStageError):
+                exc.details.setdefault("artifacts", str(context.artifacts.root))
+                exc.details.setdefault("manifest", str(manifest_path))
+                raise
+            raise PipelineStageError(
+                name,
+                f"Pipeline stage {name!r} failed.",
+                details={
+                    "artifacts": str(context.artifacts.root),
+                    "manifest": str(manifest_path),
+                },
+                cause=exc,
+            ) from exc
 
     def _ocr(self, context: RunContext) -> None:
         result = context.ocr.extract(context.input_pdf, context.artifacts)
@@ -84,7 +98,7 @@ class Pipeline:
     def _summarise(self, context: RunContext) -> None:
         prompt = load_prompt(context.config.prompts["summarise"])
         successes: dict[str, str] = {}
-        failures: dict[str, str] = {}
+        failures: dict[str, dict[str, object]] = {}
         max_workers = min(
             int(context.config.runtime.get("concurrency", 4)),
             max(len(context.config.summarisers), 1),
@@ -107,18 +121,17 @@ class Pipeline:
                     successes[provider_id] = summary
                     context.artifacts.write_text(f"03_summaries/{provider_id}.txt", summary)
                 except Exception as exc:
-                    failures[provider_id] = str(exc)
+                    provider = context.providers[provider_id]
+                    provider_error = exception_summary(exc)
+                    provider_error.setdefault(
+                        "details",
+                        {
+                            "provider": provider_id,
+                            "model": getattr(provider, "model", "unknown"),
+                        },
+                    )
+                    failures[provider_id] = provider_error
 
-        if len(successes) < context.config.min_summaries:
-            raise RuntimeError(
-                f"Only {len(successes)} summaries succeeded; min_summaries is {context.config.min_summaries}."
-            )
-
-        context.summaries = {
-            provider_id: successes[provider_id]
-            for provider_id in context.config.summarisers
-            if provider_id in successes
-        }
         context.manifest.setdefault("prompts", {})["summarise"] = {
             "path": str(prompt.path),
             "sha256": prompt.sha256,
@@ -126,6 +139,23 @@ class Pipeline:
         context.manifest["summarisation_providers"] = {
             "succeeded": sorted(successes),
             "failed": failures,
+        }
+
+        if len(successes) < context.config.min_summaries:
+            raise PipelineStageError(
+                "summarisation",
+                f"Only {len(successes)} summaries succeeded; min_summaries is {context.config.min_summaries}.",
+                details={
+                    "succeeded": sorted(successes),
+                    "failed": sorted(failures),
+                    "min_summaries": context.config.min_summaries,
+                },
+            )
+
+        context.summaries = {
+            provider_id: successes[provider_id]
+            for provider_id in context.config.summarisers
+            if provider_id in successes
         }
 
     def _consolidate(self, context: RunContext) -> None:
