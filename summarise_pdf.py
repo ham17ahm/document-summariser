@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 import os
+import sys
 from pathlib import Path
 
 from document_summariser.artifacts import ArtifactStore
+from document_summariser.cli import copy_final_docx
 from document_summariser.config import load_config
 from document_summariser.env import load_local_env
 from document_summariser.ocr import build_ocr_adapter
@@ -15,18 +16,14 @@ from document_summariser.stages.context import RunContext
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="summarise")
-    parser.add_argument("pdf", help="Path to a single PDF to summarise.")
+    parser = argparse.ArgumentParser(
+        description="Summarise a PDF and write the final DOCX beside the input file.",
+    )
+    parser.add_argument("pdf", help="Path to the PDF file.")
     parser.add_argument(
         "--config",
         default=os.environ.get("DOCUMENT_SUMMARISER_CONFIG", "config/config.yaml"),
         help="Path to config YAML.",
-    )
-    parser.add_argument("--out", default=None, help="Output runs directory.")
-    parser.add_argument(
-        "--final-docx",
-        default=None,
-        help="Optional path for a copy of the final DOCX. Defaults to run artifacts only.",
     )
     return parser
 
@@ -34,19 +31,19 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     load_local_env()
     args = build_parser().parse_args(argv)
-    config = load_config(args.config)
     input_pdf = Path(args.pdf).resolve()
-    destination = args.out or os.environ.get("DOCUMENT_SUMMARISER_OUTPUT_DIR") or config.output.get("destination", "./runs/")
-    artifacts = ArtifactStore.create(destination, input_pdf)
-    ocr = build_ocr_adapter(config)
-    providers = build_provider_registry(config)
+    config = load_config(args.config)
+    artifacts = ArtifactStore.create(
+        os.environ.get("DOCUMENT_SUMMARISER_OUTPUT_DIR") or config.output.get("destination", "./runs/"),
+        input_pdf,
+    )
 
     context = RunContext(
         input_pdf=input_pdf,
         config=config,
         artifacts=artifacts,
-        ocr=ocr,
-        providers=providers,
+        ocr=build_ocr_adapter(config),
+        providers=build_provider_registry(config),
         manifest={
             "input_file": str(input_pdf),
             "config_file": str(config.source_path),
@@ -57,20 +54,12 @@ def main(argv: list[str] | None = None) -> int:
             },
         },
     )
+
     Pipeline().run(context)
-    if args.final_docx:
-        final_docx = copy_final_docx(artifacts.root / "05_output.docx", Path(args.final_docx))
-        print(f"Wrote final DOCX to {final_docx}")
-    print(f"Wrote run artifacts to {artifacts.root}")
+    final_path = copy_final_docx(artifacts.root / "05_output.docx", input_pdf.with_suffix(".docx"))
+    print(final_path)
     return 0
 
 
-def copy_final_docx(source: Path, destination: Path) -> Path:
-    destination = destination.resolve()
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source, destination)
-    return destination
-
-
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))

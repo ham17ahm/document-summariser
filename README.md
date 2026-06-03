@@ -31,7 +31,29 @@ Fill in `.env` later with:
 
 Do not commit `.env` or credential JSON files.
 
-## Run
+## Simple Run
+
+To create only the final Word file beside the input PDF:
+
+```bash
+.venv/bin/python summarise_pdf.py /absolute/path/to/input.pdf
+```
+
+For example, this command:
+
+```bash
+.venv/bin/python summarise_pdf.py ~/Documents/report.pdf
+```
+
+creates:
+
+```text
+~/Documents/report.docx
+```
+
+The script prints the final DOCX path when it finishes.
+
+## Advanced Run
 
 ```bash
 .venv/bin/summarise path/to/input.pdf
