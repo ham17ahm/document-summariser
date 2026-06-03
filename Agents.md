@@ -2,202 +2,296 @@
 
 ## Purpose
 
-This file defines the engineering principles that any AI agent, coding assistant, or contributor must follow when designing, modifying, reviewing, and implementing code in this repository.
+This repository is a Python CLI app for PDF OCR, OCR correction, Urdu summarisation, multi-provider consolidation, and plain UTF-8 text output.
 
-The goal is to produce code that is maintainable, extensible, testable, understandable, and resilient to change.
+AI agents working in this repo should make focused, safe, well-tested changes while preserving the existing pipeline unless explicitly asked to change it.
 
----
+Priorities:
 
-## Core Design Principles
-
-### 1. Single Responsibility Principle, SRP
-
-Each class, module, function, or component should have one clear reason to change.
-
-When implementing code:
-
-- Keep each unit focused on a single, well-defined responsibility.
-- Avoid mixing unrelated concerns such as validation, persistence, formatting, networking, and business logic in the same place.
-- Split large classes or modules when they begin to handle multiple independent responsibilities.
-- Prefer small, focused functions over broad, multipurpose ones.
-
-Before adding code, ask:
-
-> Is this responsibility already handled somewhere else, or should this be a separate module?
+1. Preserve existing behaviour.
+2. Make the smallest safe change.
+3. Keep code clear, testable, and maintainable.
+4. Keep provider-specific logic isolated.
+5. Verify changes before reporting completion.
+6. Never expose or commit secrets.
 
 ---
 
-### 2. Open-Closed Principle, OCP
+## Codebase Overview
 
-Software components should be open for extension but closed for modification.
+The app flow is:
 
-When implementing code:
+1. Validate input PDF.
+2. Render PDF pages to PNG using PyMuPDF.
+3. Save page images under `page_images/`.
+4. Run Google Cloud Vision OCR.
+5. Correct OCR text using Gemini with rendered page images attached.
+6. Summarise corrected text in parallel with ChatGPT, Gemini, Grok, and DeepSeek.
+7. Require at least `pipeline.min_summaries` successful summaries.
+8. Consolidate summaries with Claude.
+9. Write final Urdu output as plain UTF-8 text.
+10. Write intermediate artifacts and `manifest.json`.
 
-- Design systems so new behavior can be added without rewriting stable, working logic.
-- Prefer extension points such as interfaces, abstractions, configuration, composition, plugins, strategies, or handlers.
-- Avoid editing core logic repeatedly for every new case when a polymorphic, registry-based, or strategy-based design would be cleaner.
-- Keep existing behavior stable unless the task explicitly requires changing it.
+Canonical editable config:
 
-Before modifying existing code, ask:
+```text
+config/master_config.yaml
+```
 
-> Can this new behavior be added through extension rather than changing established logic?
-
----
-
-### 3. Liskov Substitution Principle, LSP
-
-Subtypes must be safely replaceable for their base types without breaking expected behavior.
-
-When implementing code:
-
-- Ensure subclasses, implementations, or derived components honor the contracts of their parents or interfaces.
-- Do not weaken preconditions, strengthen postconditions unexpectedly, or throw surprising errors from a subtype.
-- Avoid inheritance when the derived type does not truly behave like the parent type.
-- Prefer composition over inheritance when behavior does not fit a strict “is-a” relationship.
-
-Before creating a subtype, ask:
-
-> Can this implementation be used anywhere the parent type is expected without surprising the caller?
+Final output is text only. Do not reintroduce DOCX output or `python-docx` unless explicitly requested.
 
 ---
 
-### 4. Interface Segregation Principle, ISP
+## Key Files
 
-Code should not depend on methods, fields, or interfaces it does not use.
+```text
+summarise_pdf.py
+```
 
-When implementing code:
+Simple runner that writes the final `.txt` beside the input PDF.
 
-- Prefer small, focused interfaces over large, general-purpose ones.
-- Split “fat” interfaces into role-specific contracts.
-- Do not force consumers to implement unused methods.
-- Accept the narrowest interface required by a function or class.
+```text
+src/document_summariser/cli.py
+```
 
-Before adding to an interface, ask:
+CLI entry point and dependency wiring.
 
-> Do all consumers need this method, or should this belong in a smaller, separate interface?
+```text
+src/document_summariser/config.py
+```
 
----
+YAML loading, validation, and config resolution.
 
-### 5. Dependency Inversion and Dependency Injection
+```text
+src/document_summariser/ocr.py
+```
 
-High-level business logic should not depend directly on low-level infrastructure details. Both should depend on abstractions.
+OCR protocol, Google Vision OCR, mock OCR, and PDF page rendering.
 
-When implementing code:
+```text
+src/document_summariser/providers/base.py
+```
 
-- Keep business rules independent from databases, frameworks, file systems, HTTP clients, queues, and third-party services.
-- Inject dependencies from the outside instead of hard-coding them inside classes or functions.
-- Depend on abstractions, protocols, interfaces, or clearly defined contracts where useful.
-- Make dependencies explicit through constructors, function parameters, or configuration.
-- Avoid hidden global state and implicit service lookups unless they are already established project conventions.
+Provider protocol, retry behaviour, cloud adapters, and Gemini image attachments.
 
-Before adding a dependency, ask:
+```text
+src/document_summariser/providers/registry.py
+```
 
-> Can this be supplied from the outside so the code remains testable and replaceable?
+Provider factory map, including Grok and DeepSeek.
 
----
+```text
+src/document_summariser/stages/pipeline.py
+```
 
-### 6. Loose Coupling
+Pipeline orchestration and artifact writing.
 
-Modules should be as independent as possible and should share only the minimum information needed to collaborate.
+```text
+src/document_summariser/prompts.py
+```
 
-When implementing code:
+Prompt loading and strict placeholder rendering.
 
-- Minimize direct knowledge between modules.
-- Avoid making one component depend on another component’s internal structure.
-- Prefer communication through stable interfaces, events, messages, DTOs, or well-defined APIs.
-- Avoid unnecessary bidirectional dependencies.
-- Keep changes localized whenever possible.
+Prompt files live in:
 
-Before connecting modules, ask:
-
-> Does this component really need to know about that component, or can they communicate through a smaller contract?
-
----
-
-### 7. High Cohesion
-
-The contents of a module, class, or function should be strongly related and focused on a unified purpose.
-
-When implementing code:
-
-- Group related behavior together.
-- Keep unrelated behavior separate, even if it is convenient to place it in an existing file.
-- Avoid utility dumping grounds that collect unrelated helpers.
-- Name modules according to their cohesive purpose.
-- Ensure public methods on a class support the same conceptual responsibility.
-
-Before placing code in a module, ask:
-
-> Does this code naturally belong here, or is this module becoming a miscellaneous collection?
+```text
+prompts/
+src/document_summariser/defaults/prompts/
+```
 
 ---
 
-### 8. Information Hiding
+## Design Principles
 
-A module should expose a simple, stable interface while hiding internal implementation details.
+Apply these principles without over-engineering.
 
-When implementing code:
+### Keep responsibilities focused
 
-- Keep internal data structures, algorithms, and implementation details private whenever possible.
-- Expose only what callers need.
-- Avoid leaking database schemas, third-party response shapes, internal state, or framework-specific details across boundaries.
-- Use clear public APIs and protect callers from unnecessary internal changes.
-- Encapsulate complex operations behind intention-revealing methods.
+Separate OCR, correction, summarisation, consolidation, config, provider wiring, prompt rendering, CLI handling, and artifact writing.
 
-Before exposing something publicly, ask:
+Do not mix provider API details into pipeline orchestration.
 
-> Does external code genuinely need this detail, or should it remain hidden behind an interface?
+### Prefer extension points
 
----
+Add new providers through adapters and the provider registry.
 
-### 9. Law of Demeter, Principle of Least Knowledge
+Avoid hard-coding provider-specific logic into unrelated modules.
 
-A component should communicate only with its immediate collaborators and should avoid reaching through chains of objects.
+### Keep contracts narrow
 
-When implementing code:
+Provider implementations should present consistent behaviour to the pipeline even when vendor APIs differ.
 
-- Avoid long chains such as `a.getB().getC().doSomething()`.
-- Do not make callers navigate deep object graphs to perform simple tasks.
-- Add intention-revealing methods to the appropriate owning object instead of exposing internals.
-- Keep object relationships simple and local.
-- Avoid coupling code to the hidden structure of other components.
+Do not expose broad interfaces or surprising return shapes.
 
-Before using a call chain, ask:
+### Inject dependencies
 
-> Am I talking to an immediate collaborator, or am I depending on the internals of a stranger?
+Prefer explicit dependency wiring through the CLI or composition layer.
 
----
+Avoid hidden globals, scattered environment reads, and hard-coded cloud clients inside business logic.
 
-### 10. Don’t Repeat Yourself, DRY
+### Reduce coupling
 
-Every piece of logic, configuration, or business rule should have a single authoritative location.
+Pipeline code should orchestrate stages.
 
-When implementing code:
+Provider adapters should hide vendor-specific request and response details.
 
-- Avoid copy-pasting logic across files, classes, tests, or configuration.
-- Extract repeated business rules into shared functions, services, policies, constants, or configuration.
-- Keep duplicated test setup under control with builders, fixtures, or helpers when appropriate.
-- Do not over-abstract too early; remove duplication when the repeated code represents the same concept or rule.
-- Ensure bug fixes and rule changes can be made in one place.
+### Keep one source of truth
 
-Before duplicating code, ask:
+Use:
 
-> Is this the same rule or concept repeated, and should it have one source of truth?
+```text
+config/master_config.yaml
+```
+
+for runtime configuration.
+
+Use prompt files for prompt text.
+
+Avoid duplicating provider settings, prompt text, business rules, or output behaviour across modules.
 
 ---
 
-## Implementation Guidelines for Agents
+## Implementation Rules
 
-When designing or changing code, agents must follow this workflow:
+Before editing:
 
-1. Understand the existing architecture before making changes.
-2. Identify the smallest safe change that satisfies the request.
-3. Preserve existing public behavior unless the task explicitly requires changing it.
-4. Prefer clear, simple designs over clever abstractions.
-5. Introduce abstractions only when they reduce coupling, remove meaningful duplication, or support real extension needs.
-6. Keep business logic separate from infrastructure and presentation concerns.
-7. Make dependencies explicit and easy to replace in tests.
-8. Avoid broad rewrites unless the existing design prevents a correct or maintainable solution.
-9. Add or update tests for changed behavior when the project has a testing pattern.
-10. Document non-obvious design decisions in code comments or project documentation.
-11. Ask for any explanation or clarification from the user before implementing anything until a shared understanding is reached.
+1. Inspect the relevant files.
+2. Follow existing patterns.
+3. Make the smallest safe change.
+4. Preserve public behaviour unless the task requires changing it.
+5. Add or update tests when behaviour changes.
+6. Run relevant verification.
+7. Report what changed and what was verified.
+
+Prefer simple, readable Python.
+
+Avoid:
+
+- broad rewrites
+- unrelated cleanup
+- premature abstractions
+- silent exception swallowing
+- mutable global state
+- manually editing generated artifacts
+- reformatting unrelated files
+
+Add comments only for non-obvious design decisions, provider quirks, or operational constraints.
+
+---
+
+## Provider and Prompt Rules
+
+Current default providers are configured in `config/master_config.yaml`.
+
+Defaults:
+
+```text
+OCR:          Google Cloud Vision
+Correction:   Gemini gemini-2.5-pro
+Summarisers:  ChatGPT gpt-5.2
+              Gemini gemini-2.5-pro
+              Grok grok-4.3
+              DeepSeek deepseek-v4-pro
+Consolidator: Claude claude-opus-4-7
+```
+
+Important Gemini correction settings:
+
+```yaml
+max_output_tokens: 16384
+thinking_config.thinking_budget: 1024
+```
+
+These settings fixed a previous Gemini issue where the model spent the output budget on thinking tokens. Do not reduce or remove them without a specific reason.
+
+Prompt rules:
+
+- Keep prompt text in prompt files.
+- Preserve strict placeholder rendering.
+- Keep editable prompts and packaged default prompts in sync when needed.
+- If changing the number of summariser providers, check `consolidate.prompt.txt` and `pipeline.min_summaries`.
+
+---
+
+## Security Rules
+
+Never commit or expose:
+
+```text
+.env
+.env.*
+API keys
+service-account JSON files
+Google credential files
+private document contents
+generated outputs containing sensitive text
+```
+
+Expected local environment variables may include:
+
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=...
+ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
+GEMINI_API_KEY=...
+XAI_API_KEY=...
+DEEPSEEK_API_KEY=...
+DOCUMENT_SUMMARISER_CONFIG=config/master_config.yaml
+DOCUMENT_SUMMARISER_OUTPUT_DIR=./runs/
+```
+
+Tests must not require real API keys.
+
+Use mocks for OCR and model providers.
+
+---
+
+## Verification Commands
+
+Use the active Python environment or virtual environment.
+
+Compile check:
+
+```bash
+python -m compileall -q src tests summarise_pdf.py
+```
+
+Run tests:
+
+```bash
+python -m pytest -q --basetemp=pytest-tmp -p no:cacheprovider
+```
+
+Check CLI:
+
+```bash
+summarise --help
+```
+
+Expected current test result:
+
+```text
+18 passed
+```
+
+On Windows/sandbox setups, pytest may need to run outside the sandbox because temp directories can receive ACLs the sandbox cannot scan.
+
+Do not claim tests passed unless they were actually run.
+
+---
+
+## Definition of Done
+
+A task is complete when:
+
+- the requested change is implemented
+- behaviour is preserved unless intentionally changed
+- the diff is focused
+- relevant tests or checks were run where practical
+- config and prompt changes are kept in sync
+- no secrets or sensitive generated outputs are exposed
+- the final response states what changed, what was verified, and any remaining risks
+
+```
+
+```
