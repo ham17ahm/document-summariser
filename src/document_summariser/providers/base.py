@@ -174,6 +174,7 @@ class GeminiProvider(BaseCloudProvider):
 
         contents = prompt
         if attachments:
+            config_kwargs["media_resolution"] = types.MediaResolution.MEDIA_RESOLUTION_HIGH
             parts = [types.Part.from_text(text=prompt)]
             for attachment in attachments:
                 path = os.fspath(attachment)

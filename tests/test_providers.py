@@ -190,6 +190,7 @@ def test_gemini_provider_sends_image_attachments(monkeypatch, tmp_path):
     fake_types = SimpleNamespace(
         Content=FakeContent,
         GenerateContentConfig=FakeGenerateContentConfig,
+        MediaResolution=SimpleNamespace(MEDIA_RESOLUTION_HIGH="MEDIA_RESOLUTION_HIGH"),
         Part=FakePart,
     )
     fake_genai = SimpleNamespace(Client=FakeClient, types=fake_types)
@@ -220,6 +221,7 @@ def test_gemini_provider_sends_image_attachments(monkeypatch, tmp_path):
         "data": b"image-bytes",
         "mime_type": "image/png",
     }
+    assert captured["config_kwargs"]["media_resolution"] == "MEDIA_RESOLUTION_HIGH"
 
 
 def _provider_registry_config():
