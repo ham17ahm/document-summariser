@@ -1,6 +1,5 @@
 from pathlib import Path
 from time import sleep
-from zipfile import ZipFile
 
 from document_summariser.artifacts import ArtifactStore
 from document_summariser.config import load_config
@@ -32,12 +31,9 @@ def test_pipeline_writes_expected_artifacts(tmp_path):
     assert (artifacts.root / "02_corrected.txt").exists()
     assert (artifacts.root / "03_summaries" / "claude.txt").exists()
     assert (artifacts.root / "04_consolidated.txt").exists()
-    assert (artifacts.root / "05_output.docx").exists()
+    assert (artifacts.root / "05_output.txt").exists()
     assert (artifacts.root / "manifest.json").exists()
-
-    with ZipFile(artifacts.root / "05_output.docx") as docx:
-        document_xml = docx.read("word/document.xml").decode("utf-8")
-    assert "w:bidi" in document_xml
+    assert (artifacts.root / "05_output.txt").read_text(encoding="utf-8").strip()
 
 
 def test_pipeline_consolidates_summaries_in_configured_order(tmp_path):

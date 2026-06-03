@@ -69,8 +69,6 @@ def load_config(path: str | Path | None = None) -> AppConfig:
         for name, prompt_path in raw.get("prompts", {}).items()
     }
     output = raw.get("output", {})
-    if "format_spec" in output:
-        output = {**output, "format_spec": _resolve_path(source_path.parent, str(output["format_spec"]))}
 
     config = AppConfig(
         source_path=source_path,
@@ -108,9 +106,6 @@ def validate_config(config: AppConfig) -> None:
     for required_prompt in ("correction", "summarise", "consolidate"):
         if required_prompt not in config.prompts:
             raise ValueError(f"Missing prompt config for {required_prompt!r}")
-    format_spec = config.output.get("format_spec")
-    if format_spec is not None and not Path(format_spec).exists():
-        raise ValueError(f"Output format spec does not exist: {format_spec}")
     if int(config.runtime.get("concurrency", 1)) < 1:
         raise ValueError("runtime.concurrency must be at least 1")
     if int(config.runtime.get("retries", 1)) < 1:

@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from document_summariser.artifacts import ArtifactStore
-from document_summariser.cli import copy_final_docx
+from document_summariser.cli import copy_final_text
 from document_summariser.config import load_config, preferred_config_path
 from document_summariser.env import load_local_env
 from document_summariser.ocr import build_ocr_adapter
@@ -17,7 +17,7 @@ from document_summariser.stages.context import RunContext
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Summarise a PDF and write the final DOCX beside the input file.",
+        description="Summarise a PDF and write the final TXT beside the input file.",
     )
     parser.add_argument("pdf", help="Path to the PDF file.")
     parser.add_argument(
@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     Pipeline().run(context)
-    final_path = copy_final_docx(artifacts.root / "05_output.docx", input_pdf.with_suffix(".docx"))
+    final_path = copy_final_text(artifacts.root / "05_output.txt", input_pdf.with_suffix(".txt"))
     print(final_path)
     return 0
 

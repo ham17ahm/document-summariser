@@ -1,6 +1,6 @@
 # Document Summariser
 
-CLI pipeline for OCR, correction, multi-provider summarisation, consolidation, and right-to-left Urdu DOCX output.
+CLI pipeline for OCR, correction, multi-provider summarisation, consolidation, and plain Urdu text output.
 
 ## What The Pipeline Does
 
@@ -10,7 +10,7 @@ CLI pipeline for OCR, correction, multi-provider summarisation, consolidation, a
 4. Corrects OCR text with the configured correction provider.
 5. Sends the corrected text to ChatGPT, Gemini, Grok, and DeepSeek in parallel.
 6. Consolidates successful summaries with Claude into one final Urdu summary.
-7. Writes a right-to-left DOCX plus intermediate artifacts and `manifest.json`.
+7. Writes a plain UTF-8 text file plus intermediate artifacts and `manifest.json`.
 
 ## Setup
 
@@ -34,7 +34,7 @@ Do not commit `.env` or credential JSON files.
 
 ## Simple Run
 
-To create only the final Word file beside the input PDF:
+To create only the final text file beside the input PDF:
 
 ```bash
 .venv/bin/python summarise_pdf.py /absolute/path/to/input.pdf
@@ -49,10 +49,10 @@ For example, this command:
 creates:
 
 ```text
-~/Documents/report.docx
+~/Documents/report.txt
 ```
 
-The script prints the final DOCX path when it finishes.
+The script prints the final TXT path when it finishes.
 
 ## Advanced Run
 
@@ -73,7 +73,7 @@ Each run creates a timestamped directory containing:
 - `02_corrected.txt`
 - `03_summaries/`
 - `04_consolidated.txt`
-- `05_output.docx`
+- `05_output.txt`
 - `manifest.json`
 
 ## Configuration
@@ -84,7 +84,7 @@ The canonical editable configuration lives in `config/master_config.yaml`.
 - Correction provider: Gemini
 - Summarisers: ChatGPT, Gemini, Grok, DeepSeek
 - Consolidator: Claude Opus 4.7 with adaptive thinking and `xhigh` effort
-- Output: right-to-left DOCX using `Noto Nastaliq Urdu`
+- Output: plain UTF-8 Urdu text
 
 Provider credentials are read from environment variables named by each provider's `api_key_env`.
 The installed CLI also ships with the same default config, prompts, and output template, so `summarise` can run from outside the repository when no `--config` value is provided. When run from this repository, the CLI prefers `config/master_config.yaml`.

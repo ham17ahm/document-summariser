@@ -1,6 +1,5 @@
-from pathlib import Path
-
 import pytest
+from pathlib import Path
 
 from document_summariser.config import default_config_path, load_config, preferred_config_path
 
@@ -28,7 +27,7 @@ def test_master_config_loads():
     assert config.providers["grok"].base_url == "https://api.x.ai/v1"
     assert config.providers["deepseek"].model == "deepseek-v4-pro"
     assert config.providers["deepseek"].type == "deepseek"
-    assert Path(config.output["format_spec"]).exists()
+    assert config.output["format"] == "txt"
 
 
 def test_packaged_default_config_loads():
@@ -38,7 +37,7 @@ def test_packaged_default_config_loads():
     assert config.source_path == default_config_path()
     assert config.summarisers == ["chatgpt", "gemini", "grok", "deepseek"]
     assert config.prompts["correction"].exists()
-    assert config.output["format_spec"].exists()
+    assert config.output["format"] == "txt"
 
 
 def test_preferred_config_path_uses_repository_master_config():

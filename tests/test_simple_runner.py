@@ -3,7 +3,7 @@ from pathlib import Path
 from summarise_pdf import main
 
 
-def test_simple_runner_writes_docx_next_to_pdf(tmp_path, monkeypatch):
+def test_simple_runner_writes_text_next_to_pdf(tmp_path, monkeypatch):
     pdf = tmp_path / "sample.pdf"
     pdf.write_bytes(b"%PDF-1.7\n% placeholder\n")
     config = _write_mock_config(tmp_path)
@@ -12,7 +12,7 @@ def test_simple_runner_writes_docx_next_to_pdf(tmp_path, monkeypatch):
     exit_code = main([str(pdf), "--config", str(config)])
 
     assert exit_code == 0
-    assert (tmp_path / "sample.docx").exists()
+    assert (tmp_path / "sample.txt").exists()
 
 
 def _write_mock_config(tmp_path: Path) -> Path:

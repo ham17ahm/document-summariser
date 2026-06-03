@@ -81,10 +81,7 @@ prompts:
   consolidate: prompts/consolidate.prompt.txt
 
 output:
-  format_spec: templates/output_format.yaml
-  title: "Urdu Summary"
-  font: "Noto Nastaliq Urdu"
-  direction: rtl
+  format: txt
   destination: ./runs/
 
 runtime:

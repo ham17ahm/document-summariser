@@ -4,20 +4,19 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import perf_counter
 
 from document_summariser.prompts import load_prompt
-from document_summariser.rendering import DocxRenderer
 from document_summariser.stages.context import RunContext
 
 
 class Pipeline:
-    def __init__(self, renderer: DocxRenderer | None = None) -> None:
-        self.renderer = renderer or DocxRenderer()
+    def __init__(self) -> None:
+        pass
 
     def run(self, context: RunContext) -> RunContext:
         self._stage("ocr", context, self._ocr)
         self._stage("correction", context, self._correct)
         self._stage("summarisation", context, self._summarise)
         self._stage("consolidation", context, self._consolidate)
-        self._stage("render", context, self._render_docx)
+        self._stage("write_text", context, self._write_text_output)
         context.artifacts.write_json("manifest.json", context.manifest)
         return context
 
@@ -143,7 +142,6 @@ class Pipeline:
             "sha256": prompt.sha256,
         }
 
-    def _render_docx(self, context: RunContext) -> None:
-        output_path = context.artifacts.root / "05_output.docx"
-        self.renderer.render(context.consolidated_summary, output_path, context.config)
-        context.manifest["output_docx"] = str(output_path)
+    def _write_text_output(self, context: RunContext) -> None:
+        output_path = context.artifacts.write_text("05_output.txt", context.consolidated_summary)
+        context.manifest["output_text"] = str(output_path)

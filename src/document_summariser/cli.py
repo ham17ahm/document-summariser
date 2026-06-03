@@ -24,9 +24,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--out", default=None, help="Output runs directory.")
     parser.add_argument(
-        "--final-docx",
+        "--final-text",
         default=None,
-        help="Optional path for a copy of the final DOCX. Defaults to run artifacts only.",
+        help="Optional path for a copy of the final TXT output. Defaults to run artifacts only.",
     )
     return parser
 
@@ -58,14 +58,14 @@ def main(argv: list[str] | None = None) -> int:
         },
     )
     Pipeline().run(context)
-    if args.final_docx:
-        final_docx = copy_final_docx(artifacts.root / "05_output.docx", Path(args.final_docx))
-        print(f"Wrote final DOCX to {final_docx}")
+    if args.final_text:
+        final_text = copy_final_text(artifacts.root / "05_output.txt", Path(args.final_text))
+        print(f"Wrote final TXT to {final_text}")
     print(f"Wrote run artifacts to {artifacts.root}")
     return 0
 
 
-def copy_final_docx(source: Path, destination: Path) -> Path:
+def copy_final_text(source: Path, destination: Path) -> Path:
     destination = destination.resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, destination)
