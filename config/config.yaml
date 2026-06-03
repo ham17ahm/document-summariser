@@ -59,6 +59,7 @@ prompts:
 
 output:
   format: txt
+  final_text_directory: 'C:\Users\Hamad.Mobeen\Downloads'
   destination: ./runs/
 
 runtime:

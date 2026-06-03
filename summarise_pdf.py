@@ -56,7 +56,8 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     Pipeline().run(context)
-    final_path = copy_final_text(artifacts.root / "05_output.txt", input_pdf.with_suffix(".txt"))
+    final_output_dir = Path(config.output.get("final_text_directory", input_pdf.parent)).expanduser()
+    final_path = copy_final_text(artifacts.root / "05_output.txt", final_output_dir / input_pdf.with_suffix(".txt").name)
     print(final_path)
     return 0
 

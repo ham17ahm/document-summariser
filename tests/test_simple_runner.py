@@ -15,7 +15,21 @@ def test_simple_runner_writes_text_next_to_pdf(tmp_path, monkeypatch):
     assert (tmp_path / "sample.txt").exists()
 
 
-def _write_mock_config(tmp_path: Path) -> Path:
+def test_simple_runner_uses_configured_final_text_directory(tmp_path, monkeypatch):
+    pdf = tmp_path / "sample.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n% placeholder\n")
+    final_dir = tmp_path / "final"
+    config = _write_mock_config(tmp_path, final_text_directory=final_dir)
+    monkeypatch.setenv("DOCUMENT_SUMMARISER_OUTPUT_DIR", str(tmp_path / "runs"))
+
+    exit_code = main([str(pdf), "--config", str(config)])
+
+    assert exit_code == 0
+    assert (final_dir / "sample.txt").exists()
+    assert not (tmp_path / "sample.txt").exists()
+
+
+def _write_mock_config(tmp_path: Path, final_text_directory: Path | None = None) -> Path:
     config_path = tmp_path / "config.yaml"
     correction = Path("prompts/correction.prompt.txt").resolve()
     summarise = Path("prompts/summarise.prompt.txt").resolve()
@@ -55,6 +69,7 @@ prompts:
 
 output:
   destination: {tmp_path / "runs"}
+{f"  final_text_directory: {final_text_directory}" if final_text_directory else ""}
 
 runtime:
   concurrency: 2

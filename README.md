@@ -34,7 +34,7 @@ Do not commit `.env` or credential JSON files.
 
 ## Simple Run
 
-To create only the final text file beside the input PDF:
+To create the final text file in the configured final output folder:
 
 ```bash
 .venv/bin/python summarise_pdf.py /absolute/path/to/input.pdf
@@ -49,10 +49,10 @@ For example, this command:
 creates:
 
 ```text
-~/Documents/report.txt
+C:\Users\Hamad.Mobeen\Downloads\report.txt
 ```
 
-The script prints the final TXT path when it finishes.
+The script prints the final TXT path when it finishes. The default final output folder is configured by `output.final_text_directory` in `config/master_config.yaml`.
 
 ## Advanced Run
 

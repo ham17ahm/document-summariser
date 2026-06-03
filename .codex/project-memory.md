@@ -20,7 +20,7 @@ This repo is a Python CLI app for PDF OCR, Urdu summarisation, multi-provider co
 7. Consolidate provider summaries with Claude.
 8. Write the final Urdu summary as plain UTF-8 text:
    - run artifact: `05_output.txt`
-   - simple runner copy: `<input-pdf-stem>.txt` beside the PDF
+   - simple runner copy: `<input-pdf-stem>.txt` in `output.final_text_directory`
 9. Write intermediate artifacts and `manifest.json`.
 
 ## Current Default Providers
@@ -100,4 +100,5 @@ On this Windows/sandbox setup, pytest may need to run outside the sandbox becaus
 - Live OCR with Google Vision has succeeded on `X:\PS Office\Scan-Hamad\20260603133539.pdf`.
 - A previous Gemini correction failure was caused by Gemini spending the full output budget on thinking tokens. The fix was to raise Gemini `max_output_tokens` and set `thinking_config.thinking_budget`.
 - Final output is now text only. DOCX rendering and the `python-docx` dependency were removed.
+- The default final text directory is `C:\Users\Hamad.Mobeen\Downloads`.
 - Tests use mock OCR and mock model providers, so they do not require API keys.
