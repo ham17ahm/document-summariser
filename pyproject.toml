@@ -21,6 +21,20 @@ dev = [
 [project.scripts]
 summarise = "document_summariser.cli:main"
 
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+document_summariser = [
+  "defaults/config.yaml",
+  "defaults/prompts/*.txt",
+  "defaults/templates/*.yaml",
+]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

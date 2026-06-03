@@ -1,6 +1,3 @@
-# Compatibility copy of config/master_config.yaml.
-# Prefer editing config/master_config.yaml for repository runs.
-
 language:
   summary_language: ur
 

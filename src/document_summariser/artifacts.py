@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 
 class ArtifactStore:
@@ -15,9 +16,12 @@ class ArtifactStore:
 
     @classmethod
     def create(cls, destination: str | Path, input_pdf: Path) -> "ArtifactStore":
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
         name = input_pdf.stem.replace(" ", "-")
-        return cls(Path(destination) / f"{timestamp}-{name}")
+        root = Path(destination).expanduser() / f"{timestamp}-{name}"
+        if root.exists():
+            root = root.with_name(f"{root.name}-{uuid4().hex[:8]}")
+        return cls(root)
 
     def write_json(self, relative_path: str, payload: Any) -> Path:
         path = self.root / relative_path

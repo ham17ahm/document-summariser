@@ -44,6 +44,17 @@ def _build_deepseek_provider(provider: ProviderConfig, timeout_seconds: float, r
     )
 
 
+def _build_grok_provider(provider: ProviderConfig, timeout_seconds: float, retry_policy: RetryPolicy) -> ProviderAdapter:
+    return OpenAICompatibleProvider(
+        id=provider.id,
+        model=provider.model,
+        config=provider,
+        timeout_seconds=timeout_seconds,
+        retry_policy=retry_policy,
+        max_tokens_parameter="max_tokens",
+    )
+
+
 def _build_cloud_provider(
     provider_class: ProviderFactory,
     provider: ProviderConfig,
@@ -66,6 +77,8 @@ PROVIDER_FACTORIES: dict[str, RegistryFactory] = {
     ),
     "openai": _build_openai_provider,
     "deepseek": _build_deepseek_provider,
+    "grok": _build_grok_provider,
+    "xai": _build_grok_provider,
     "gemini": lambda provider, timeout, retry: _build_cloud_provider(GeminiProvider, provider, timeout, retry),
     "google_gemini": lambda provider, timeout, retry: _build_cloud_provider(
         GeminiProvider, provider, timeout, retry

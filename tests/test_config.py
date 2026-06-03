@@ -2,19 +2,39 @@ from pathlib import Path
 
 import pytest
 
-from document_summariser.config import load_config
+from document_summariser.config import default_config_path, load_config, preferred_config_path
 
 
-def test_default_config_loads():
-    config = load_config("config/config.yaml")
+def test_master_config_loads():
+    config = load_config("config/master_config.yaml")
 
     assert config.summary_language == "ur"
-    assert config.min_summaries == 2
+    assert config.min_summaries == 4
     assert config.correction_provider == "gemini"
-    assert config.summarisers == ["claude", "gpt", "gemini", "deepseek"]
+    assert config.summarisers == ["chatgpt", "gemini", "grok", "deepseek"]
     assert config.consolidator == "claude"
     assert config.ocr["provider"] == "google_cloud_vision"
+    assert config.providers["claude"].model == "claude-sonnet-4-20250514"
+    assert config.providers["chatgpt"].model == "gpt-5.2"
+    assert config.providers["gemini"].model == "gemini-2.5-pro"
+    assert config.providers["grok"].type == "grok"
+    assert config.providers["grok"].base_url == "https://api.x.ai/v1"
     assert config.providers["deepseek"].type == "deepseek"
+    assert Path(config.output["format_spec"]).exists()
+
+
+def test_packaged_default_config_loads():
+    config = load_config()
+
+    assert default_config_path().exists()
+    assert config.source_path == default_config_path()
+    assert config.summarisers == ["chatgpt", "gemini", "grok", "deepseek"]
+    assert config.prompts["correction"].exists()
+    assert config.output["format_spec"].exists()
+
+
+def test_preferred_config_path_uses_repository_master_config():
+    assert preferred_config_path() == Path("config/master_config.yaml").resolve()
 
 
 def test_config_requires_correction_provider(tmp_path):

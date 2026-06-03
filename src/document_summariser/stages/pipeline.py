@@ -42,6 +42,8 @@ class Pipeline:
     def _ocr(self, context: RunContext) -> None:
         result = context.ocr.extract(context.input_pdf, context.artifacts)
         context.ocr_text = result.text
+        if not context.ocr_text.strip():
+            raise RuntimeError("OCR completed but produced no text.")
         context.artifacts.write_json("01_ocr.json", result.to_json())
 
     def _correct(self, context: RunContext) -> None:
@@ -59,14 +61,17 @@ class Pipeline:
         prompt = load_prompt(context.config.prompts["summarise"])
         successes: dict[str, str] = {}
         failures: dict[str, str] = {}
-        max_workers = int(context.config.runtime.get("concurrency", 4))
+        max_workers = min(
+            int(context.config.runtime.get("concurrency", 4)),
+            max(len(context.config.summarisers), 1),
+        )
+        rendered = prompt.render(
+            document=context.corrected_text,
+            summary_language=context.config.summary_language,
+        )
 
         def call(provider_id: str) -> tuple[str, str]:
             provider = context.providers[provider_id]
-            rendered = prompt.render(
-                document=context.corrected_text,
-                summary_language=context.config.summary_language,
-            )
             return provider_id, provider.generate(rendered)
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -85,7 +90,11 @@ class Pipeline:
                 f"Only {len(successes)} summaries succeeded; min_summaries is {context.config.min_summaries}."
             )
 
-        context.summaries = successes
+        context.summaries = {
+            provider_id: successes[provider_id]
+            for provider_id in context.config.summarisers
+            if provider_id in successes
+        }
         context.manifest.setdefault("prompts", {})["summarise"] = {
             "path": str(prompt.path),
             "sha256": prompt.sha256,
@@ -97,7 +106,11 @@ class Pipeline:
 
     def _consolidate(self, context: RunContext) -> None:
         prompt = load_prompt(context.config.prompts["consolidate"])
-        labelled = "\n\n".join(f"## {provider_id}\n{summary}" for provider_id, summary in context.summaries.items())
+        labelled = "\n\n".join(
+            f"## {provider_id}\n{context.summaries[provider_id]}"
+            for provider_id in context.config.summarisers
+            if provider_id in context.summaries
+        )
         provider = context.providers[context.config.consolidator]
         consolidated = provider.generate(
             prompt.render(summaries=labelled, summary_language=context.config.summary_language)

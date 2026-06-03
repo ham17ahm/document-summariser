@@ -8,8 +8,8 @@ CLI pipeline for OCR, correction, multi-provider summarisation, consolidation, a
 2. Renders each PDF page to a PNG artifact.
 3. Sends each page image to Google Cloud Vision document OCR.
 4. Corrects OCR text with the configured correction provider.
-5. Sends the corrected text to Claude, OpenAI, Gemini, and DeepSeek in parallel.
-6. Consolidates successful summaries into one final Urdu summary.
+5. Sends the corrected text to ChatGPT, Gemini, Grok, and DeepSeek in parallel.
+6. Consolidates successful summaries with Claude into one final Urdu summary.
 7. Writes a right-to-left DOCX plus intermediate artifacts and `manifest.json`.
 
 ## Setup
@@ -27,6 +27,7 @@ Fill in `.env` later with:
 - `ANTHROPIC_API_KEY`
 - `OPENAI_API_KEY`
 - `GEMINI_API_KEY`
+- `XAI_API_KEY`
 - `DEEPSEEK_API_KEY`
 
 Do not commit `.env` or credential JSON files.
@@ -77,15 +78,23 @@ Each run creates a timestamped directory containing:
 
 ## Configuration
 
-Production defaults live in `config/config.yaml`.
+The canonical editable configuration lives in `config/master_config.yaml`.
 
 - OCR provider: Google Cloud Vision
 - Correction provider: Gemini
-- Summarisers: Claude, OpenAI, Gemini, DeepSeek
+- Summarisers: ChatGPT, Gemini, Grok, DeepSeek
 - Consolidator: Claude
 - Output: right-to-left DOCX using `Noto Nastaliq Urdu`
 
 Provider credentials are read from environment variables named by each provider's `api_key_env`.
+The installed CLI also ships with the same default config, prompts, and output template, so `summarise` can run from outside the repository when no `--config` value is provided. When run from this repository, the CLI prefers `config/master_config.yaml`.
+
+Common changes should be made in:
+
+- `pipeline.summarisers` to choose which services produce independent summaries.
+- `pipeline.consolidator` to choose the final consolidation service.
+- `providers.<name>.model` to change a provider model.
+- `runtime.concurrency`, `runtime.retries`, and `runtime.request_timeout_seconds` for operational tuning.
 
 ## Tests
 

@@ -1,5 +1,15 @@
-# Compatibility copy of config/master_config.yaml.
-# Prefer editing config/master_config.yaml for repository runs.
+# Master configuration for the document summariser.
+#
+# The fields you will most often change are:
+# - pipeline.correction_provider
+# - pipeline.summarisers
+# - pipeline.consolidator
+# - providers.<provider>.model
+# - providers.<provider>.max_output_tokens
+# - runtime.concurrency / runtime.retries
+#
+# API keys and Google credential files are intentionally not stored here.
+# Put secret values in .env using the environment variable names below.
 
 language:
   summary_language: ur
@@ -11,9 +21,18 @@ ocr:
   low_confidence_threshold: 0.8
 
 pipeline:
+  # Used to clean up OCR text before the four independent summaries.
   correction_provider: gemini
+
+  # Independent summaries are requested from these four services.
+  # Change this list if you want to add/remove a summarisation service.
   summarisers: [chatgpt, gemini, grok, deepseek]
+
+  # Final consolidation of the four summaries.
   consolidator: claude
+
+  # Set to 4 when all four summarisation services must succeed.
+  # Lower this if you want the run to continue when a provider is temporarily down.
   min_summaries: 4
 
 providers:
@@ -22,23 +41,27 @@ providers:
     model: gpt-5.2
     api_key_env: OPENAI_API_KEY
     max_output_tokens: 4096
+
   gemini:
     type: gemini
     model: gemini-2.5-pro
     api_key_env: GEMINI_API_KEY
     max_output_tokens: 4096
+
   grok:
     type: grok
     model: grok-4.3
     api_key_env: XAI_API_KEY
     base_url: https://api.x.ai/v1
     max_output_tokens: 4096
+
   deepseek:
     type: deepseek
     model: deepseek-v4-flash
     api_key_env: DEEPSEEK_API_KEY
     base_url: https://api.deepseek.com
     max_output_tokens: 4096
+
   claude:
     type: anthropic
     model: claude-sonnet-4-20250514

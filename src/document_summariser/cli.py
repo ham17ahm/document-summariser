@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from document_summariser.artifacts import ArtifactStore
-from document_summariser.config import load_config
+from document_summariser.config import load_config, preferred_config_path
 from document_summariser.env import load_local_env
 from document_summariser.ocr import build_ocr_adapter
 from document_summariser.providers.registry import build_provider_registry
@@ -19,7 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("pdf", help="Path to a single PDF to summarise.")
     parser.add_argument(
         "--config",
-        default=os.environ.get("DOCUMENT_SUMMARISER_CONFIG", "config/config.yaml"),
+        default=os.environ.get("DOCUMENT_SUMMARISER_CONFIG") or str(preferred_config_path()),
         help="Path to config YAML.",
     )
     parser.add_argument("--out", default=None, help="Output runs directory.")

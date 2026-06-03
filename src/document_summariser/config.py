@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
@@ -38,8 +39,19 @@ class AppConfig:
     runtime: dict[str, Any]
 
 
-def load_config(path: str | Path) -> AppConfig:
-    source_path = Path(path)
+def default_config_path() -> Path:
+    return Path(str(resources.files("document_summariser").joinpath("defaults/config.yaml")))
+
+
+def preferred_config_path() -> Path:
+    local_master = Path("config/master_config.yaml").resolve()
+    if local_master.exists():
+        return local_master
+    return default_config_path()
+
+
+def load_config(path: str | Path | None = None) -> AppConfig:
+    source_path = Path(path).expanduser().resolve() if path is not None else default_config_path()
     with source_path.open("r", encoding="utf-8") as handle:
         if yaml is not None:
             raw = yaml.safe_load(handle) or {}
@@ -56,6 +68,9 @@ def load_config(path: str | Path) -> AppConfig:
         name: _resolve_path(source_path.parent, prompt_path)
         for name, prompt_path in raw.get("prompts", {}).items()
     }
+    output = raw.get("output", {})
+    if "format_spec" in output:
+        output = {**output, "format_spec": _resolve_path(source_path.parent, str(output["format_spec"]))}
 
     config = AppConfig(
         source_path=source_path,
@@ -68,7 +83,7 @@ def load_config(path: str | Path) -> AppConfig:
         min_summaries=int(pipeline.get("min_summaries", 1)),
         providers=providers,
         prompts=prompts,
-        output=raw.get("output", {}),
+        output=output,
         runtime=raw.get("runtime", {}),
     )
     validate_config(config)
@@ -93,6 +108,9 @@ def validate_config(config: AppConfig) -> None:
     for required_prompt in ("correction", "summarise", "consolidate"):
         if required_prompt not in config.prompts:
             raise ValueError(f"Missing prompt config for {required_prompt!r}")
+    format_spec = config.output.get("format_spec")
+    if format_spec is not None and not Path(format_spec).exists():
+        raise ValueError(f"Output format spec does not exist: {format_spec}")
     if int(config.runtime.get("concurrency", 1)) < 1:
         raise ValueError("runtime.concurrency must be at least 1")
     if int(config.runtime.get("retries", 1)) < 1:
@@ -129,8 +147,20 @@ def _optional_float(value: Any) -> float | None:
 
 
 def _resolve_path(base: Path, value: str) -> Path:
-    path = Path(value)
-    return path if path.is_absolute() else (base.parent / path).resolve()
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return path.resolve()
+
+    candidates = (
+        base / path,
+        base.parent / path,
+        Path.cwd() / path,
+    )
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        if resolved.exists():
+            return resolved
+    return (base / path).resolve()
 
 
 def _simple_yaml_load(text: str) -> dict[str, Any]:

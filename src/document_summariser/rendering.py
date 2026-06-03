@@ -19,23 +19,33 @@ class DocxRenderer:
         from docx.enum.text import WD_ALIGN_PARAGRAPH
 
         document = Document()
+        title_text = str(config.output.get("title", "Urdu Summary"))
+        font = str(config.output.get("font", "Noto Nastaliq Urdu"))
         style = document.styles["Normal"]
-        style.font.name = str(config.output.get("font", "Noto Nastaliq Urdu"))
+        style.font.name = font
+        _set_style_complex_script_font(style, font)
 
-        title = document.add_heading("Urdu Summary", level=1)
+        title = document.add_heading(title_text, level=1)
         title.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         _set_paragraph_rtl(title)
+        for run in title.runs:
+            _set_run_rtl(run, font)
 
         for block in summary.split("\n\n"):
+            if not block.strip():
+                continue
             paragraph = document.add_paragraph(block)
             paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
             _set_paragraph_rtl(paragraph)
+            for run in paragraph.runs:
+                _set_run_rtl(run, font)
 
         document.save(output_path)
 
     def _render_minimal_docx(self, summary: str, output_path: Path, config: AppConfig) -> None:
         font = str(config.output.get("font", "Noto Nastaliq Urdu"))
-        paragraphs = ["Urdu Summary", *summary.split("\n\n")]
+        title_text = str(config.output.get("title", "Urdu Summary"))
+        paragraphs = [title_text, *summary.split("\n\n")]
         body = "".join(_docx_paragraph(paragraph, font) for paragraph in paragraphs if paragraph.strip())
         document_xml = (
             '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -87,3 +97,34 @@ def _set_paragraph_rtl(paragraph) -> None:
     p_pr = paragraph._p.get_or_add_pPr()
     if p_pr.find("w:bidi", p_pr.nsmap) is None:
         p_pr.append(OxmlElement("w:bidi"))
+
+
+def _set_run_rtl(run, font: str) -> None:
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    run.font.name = font
+    r_pr = run._r.get_or_add_rPr()
+
+    r_fonts = r_pr.rFonts
+    if r_fonts is None:
+        r_fonts = OxmlElement("w:rFonts")
+        r_pr.append(r_fonts)
+    for attribute in ("w:ascii", "w:hAnsi", "w:cs"):
+        r_fonts.set(qn(attribute), font)
+
+    if r_pr.find("w:rtl", r_pr.nsmap) is None:
+        r_pr.append(OxmlElement("w:rtl"))
+
+
+def _set_style_complex_script_font(style, font: str) -> None:
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    r_pr = style.element.get_or_add_rPr()
+    r_fonts = r_pr.rFonts
+    if r_fonts is None:
+        r_fonts = OxmlElement("w:rFonts")
+        r_pr.append(r_fonts)
+    for attribute in ("w:ascii", "w:hAnsi", "w:cs"):
+        r_fonts.set(qn(attribute), font)

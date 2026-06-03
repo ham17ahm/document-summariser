@@ -34,6 +34,17 @@ def test_registry_builds_deepseek_as_openai_compatible_provider():
     assert provider.max_tokens_parameter == "max_tokens"
 
 
+def test_registry_builds_grok_as_openai_compatible_provider():
+    config = _provider_registry_config()
+
+    registry = build_provider_registry(config)
+
+    provider = registry["grok"]
+    assert isinstance(provider, OpenAICompatibleProvider)
+    assert provider.max_tokens_parameter == "max_tokens"
+    assert provider.config.base_url == "https://api.x.ai/v1"
+
+
 def _provider_registry_config():
     class Config:
         runtime = {"retries": 1, "request_timeout_seconds": 1}
@@ -44,7 +55,14 @@ def _provider_registry_config():
                 model="deepseek-test",
                 api_key_env="DEEPSEEK_API_KEY",
                 base_url="https://api.deepseek.com",
-            )
+            ),
+            "grok": ProviderConfig(
+                id="grok",
+                type="grok",
+                model="grok-test",
+                api_key_env="XAI_API_KEY",
+                base_url="https://api.x.ai/v1",
+            ),
         }
 
     return Config()
