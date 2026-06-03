@@ -42,6 +42,11 @@ class Pipeline:
     def _ocr(self, context: RunContext) -> None:
         result = context.ocr.extract(context.input_pdf, context.artifacts)
         context.ocr_text = result.text
+        context.ocr_page_images = [
+            str(page.image_path)
+            for page in result.pages
+            if page.image_path
+        ]
         if not context.ocr_text.strip():
             raise RuntimeError("OCR completed but produced no text.")
         context.artifacts.write_json("01_ocr.json", result.to_json())
@@ -49,7 +54,10 @@ class Pipeline:
     def _correct(self, context: RunContext) -> None:
         prompt = load_prompt(context.config.prompts["correction"])
         provider = context.providers[context.config.correction_provider]
-        corrected = provider.generate(prompt.render(ocr_text=context.ocr_text))
+        corrected = provider.generate(
+            prompt.render(ocr_text=context.ocr_text),
+            attachments=context.ocr_page_images or None,
+        )
         context.corrected_text = corrected
         context.artifacts.write_text("02_corrected.txt", corrected)
         context.manifest.setdefault("prompts", {})["correction"] = {
@@ -106,14 +114,27 @@ class Pipeline:
 
     def _consolidate(self, context: RunContext) -> None:
         prompt = load_prompt(context.config.prompts["consolidate"])
+        ordered_summaries = [
+            context.summaries[provider_id]
+            for provider_id in context.config.summarisers
+            if provider_id in context.summaries
+        ]
         labelled = "\n\n".join(
             f"## {provider_id}\n{context.summaries[provider_id]}"
             for provider_id in context.config.summarisers
             if provider_id in context.summaries
         )
+        summary_variables = {
+            f"summary{index}": ordered_summaries[index - 1] if index <= len(ordered_summaries) else ""
+            for index in range(1, 5)
+        }
         provider = context.providers[context.config.consolidator]
         consolidated = provider.generate(
-            prompt.render(summaries=labelled, summary_language=context.config.summary_language)
+            prompt.render(
+                summaries=labelled,
+                summary_language=context.config.summary_language,
+                **summary_variables,
+            )
         )
         context.consolidated_summary = consolidated
         context.artifacts.write_text("04_consolidated.txt", consolidated)

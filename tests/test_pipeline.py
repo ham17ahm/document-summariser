@@ -4,6 +4,7 @@ from zipfile import ZipFile
 
 from document_summariser.artifacts import ArtifactStore
 from document_summariser.config import load_config
+from document_summariser.ocr import OcrPage, OcrResult
 from document_summariser.ocr import build_ocr_adapter
 from document_summariser.providers.registry import build_provider_registry
 from document_summariser.stages.context import RunContext
@@ -63,7 +64,36 @@ def test_pipeline_consolidates_summaries_in_configured_order(tmp_path):
     Pipeline().run(context)
 
     assert list(context.summaries) == ["slow", "fast"]
-    assert consolidator.last_prompt.index("## slow") < consolidator.last_prompt.index("## fast")
+    assert consolidator.last_prompt.index("<summary1>\nslow summary") < consolidator.last_prompt.index(
+        "<summary2>\nfast summary"
+    )
+
+
+def test_pipeline_passes_ocr_page_images_to_correction_provider(tmp_path):
+    pdf = tmp_path / "sample.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n% placeholder\n")
+    config = load_config(_write_order_config(tmp_path))
+    artifacts = ArtifactStore(tmp_path / "run")
+    image_path = artifacts.write_bytes("page_images/page_0001.png", b"png")
+    corrector = RecordingProvider("corrector", "test-model")
+
+    context = RunContext(
+        input_pdf=pdf,
+        config=config,
+        artifacts=artifacts,
+        ocr=StaticOcrAdapter(str(image_path)),
+        providers={
+            "corrector": corrector,
+            "slow": StaticProvider("slow", "test-model", "slow summary"),
+            "fast": StaticProvider("fast", "test-model", "fast summary"),
+            "consolidator": StaticProvider("consolidator", "test-model", "final summary"),
+        },
+        manifest={"input_file": str(pdf), "config_file": str(config.source_path)},
+    )
+
+    Pipeline().run(context)
+
+    assert corrector.last_attachments == [str(image_path)]
 
 
 class StaticProvider:
@@ -90,10 +120,31 @@ class RecordingProvider(StaticProvider):
     def __init__(self, provider_id: str, model: str) -> None:
         super().__init__(provider_id, model, "final summary")
         self.last_prompt = ""
+        self.last_attachments = None
 
     def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
         self.last_prompt = prompt
+        self.last_attachments = attachments
         return super().generate(prompt, attachments)
+
+
+class StaticOcrAdapter:
+    def __init__(self, image_path: str) -> None:
+        self.image_path = image_path
+
+    def extract(self, pdf_path: Path, artifacts: ArtifactStore) -> OcrResult:
+        return OcrResult(
+            provider="static",
+            pages=[
+                OcrPage(
+                    page_number=1,
+                    text="OCR text",
+                    confidence=None,
+                    low_confidence=False,
+                    image_path=self.image_path,
+                )
+            ],
+        )
 
 
 def _write_mock_config(tmp_path: Path) -> Path:

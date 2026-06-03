@@ -1,13 +1,32 @@
-You are preparing OCR output for downstream Urdu summarisation.
+You will be correcting extracted text by comparing it against the original handwritten PDF text.
 
-Return only the corrected document text. Do not summarise it yet.
+Your goal is to produce the most accurate version of the text by using the handwritten PDF as the authoritative source.
 
-Rules:
-- Preserve the original meaning and sequence of the source text.
-- Correct obvious OCR mistakes, broken words, spacing issues, and punctuation where the intended text is clear.
-- Keep Urdu, Arabic, Persian, English names, dates, numbers, and references intact.
-- If a word or phrase is uncertain, keep the best readable version instead of inventing content.
-- Do not add commentary, headings, explanations, or confidence notes.
+The original handwritten PDF pages are attached as image files. These attached page images are the authoritative source.
 
-OCR text:
+The extracted text that contains errors is provided below at the end of this prompt.
+
+Your task is to carefully compare these two versions and produce a corrected version that accurately reflects the handwritten PDF text.
+
+Follow these guidelines:
+
+1. Use the handwritten PDF text as your primary reference. This is the original and authoritative version. When there are discrepancies, the handwritten PDF text should be considered correct.
+
+2. Identify and correct errors systematically:
+   - Fix spelling mistakes and typos in the extracted text.
+   - Correct any misread characters or words.
+   - Fix punctuation errors.
+   - Correct any formatting issues.
+   - Address any missing or extra words.
+
+3. Preserve the original structure and meaning. Maintain the same sentence structure and overall organization shown in the handwritten PDF text as much as possible.
+
+4. Handle ambiguous cases carefully. If any part of the handwritten text is unclear or if you are uncertain about a correction, make your best judgment based on context without adding separate reasoning notes.
+
+5. Maintain the original language. Keep all text in Urdu and preserve any specific terminology, names, dates, references, or phrases exactly as they appear in the handwritten PDF.
+
+Return only the final corrected text. Do not summarise it. Do not include headings, explanations, reasoning, confidence notes, or markdown.
+
+[EXTRACTED TEXT]
+
 {{ocr_text}}

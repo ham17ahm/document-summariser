@@ -19,6 +19,7 @@ class RunContext:
     providers: dict[str, ProviderAdapter]
     manifest: dict[str, Any] = field(default_factory=dict)
     ocr_text: str = ""
+    ocr_page_images: list[str] = field(default_factory=list)
     corrected_text: str = ""
     summaries: dict[str, str] = field(default_factory=dict)
     consolidated_summary: str = ""

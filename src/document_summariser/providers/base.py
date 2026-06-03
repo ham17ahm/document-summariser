@@ -132,7 +132,26 @@ class OpenAICompatibleProvider(BaseCloudProvider):
 
 @dataclass
 class GeminiProvider(BaseCloudProvider):
-    def _generate_once(self, prompt: str) -> str:
+    def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
+        return self._generate_with_retry(prompt, attachments)
+
+    def _generate_with_retry(self, prompt: str, attachments: list[str] | None = None) -> str:
+        last_error: Exception | None = None
+        for attempt in range(1, self.retry_policy.attempts + 1):
+            try:
+                text = self._generate_once(prompt, attachments)
+                if not text.strip():
+                    raise ProviderError(f"{self.id} returned an empty response.")
+                return text
+            except Exception as exc:  # noqa: BLE001 - provider SDKs expose different exception classes
+                last_error = exc
+                if attempt >= self.retry_policy.attempts:
+                    break
+                sleep(self.retry_policy.initial_delay_seconds * (2 ** (attempt - 1)))
+
+        raise ProviderError(f"{self.id} failed after {self.retry_policy.attempts} attempts: {last_error}") from last_error
+
+    def _generate_once(self, prompt: str, attachments: list[str] | None = None) -> str:
         try:
             from google import genai
             from google.genai import types
@@ -145,10 +164,22 @@ class GeminiProvider(BaseCloudProvider):
             config_kwargs["max_output_tokens"] = self.config.max_output_tokens
         if self.config.temperature is not None:
             config_kwargs["temperature"] = self.config.temperature
+        if self.config.extra and "thinking_config" in self.config.extra:
+            config_kwargs["thinking_config"] = types.ThinkingConfig(**self.config.extra["thinking_config"])
+
+        contents = prompt
+        if attachments:
+            parts = [types.Part.from_text(text=prompt)]
+            for attachment in attachments:
+                path = os.fspath(attachment)
+                with open(path, "rb") as handle:
+                    data = handle.read()
+                parts.append(types.Part.from_bytes(data=data, mime_type=_mime_type_for_path(path)))
+            contents = [types.Content(role="user", parts=parts)]
 
         response = client.models.generate_content(
             model=self.model,
-            contents=prompt,
+            contents=contents,
             config=types.GenerateContentConfig(**config_kwargs) if config_kwargs else None,
         )
         if getattr(response, "text", None):
@@ -161,7 +192,29 @@ class GeminiProvider(BaseCloudProvider):
                 text = getattr(part, "text", None)
                 if text:
                     parts.append(text)
-        return "\n".join(parts)
+        text = "\n".join(parts)
+        if text.strip():
+            return text
+
+        diagnostics: list[str] = []
+        usage = getattr(response, "usage_metadata", None)
+        if usage is not None:
+            prompt_tokens = getattr(usage, "prompt_token_count", None)
+            thoughts_tokens = getattr(usage, "thoughts_token_count", None)
+            total_tokens = getattr(usage, "total_token_count", None)
+            diagnostics.append(
+                f"usage(prompt={prompt_tokens}, thoughts={thoughts_tokens}, total={total_tokens})"
+            )
+        finish_reasons = [
+            str(getattr(candidate, "finish_reason", "unknown"))
+            for candidate in getattr(response, "candidates", []) or []
+        ]
+        if finish_reasons:
+            diagnostics.append(f"finish_reasons={finish_reasons}")
+        raise ProviderError(
+            f"{self.id} returned no text"
+            + (f" ({'; '.join(diagnostics)})" if diagnostics else ".")
+        )
 
 
 @dataclass
@@ -172,3 +225,14 @@ class UnsupportedProvider:
 
     def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
         raise ProviderError(f"Unsupported provider type {self.provider_type!r} for {self.id!r}.")
+
+
+def _mime_type_for_path(path: str) -> str:
+    lowered = path.lower()
+    if lowered.endswith(".png"):
+        return "image/png"
+    if lowered.endswith((".jpg", ".jpeg")):
+        return "image/jpeg"
+    if lowered.endswith(".pdf"):
+        return "application/pdf"
+    return "application/octet-stream"

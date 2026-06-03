@@ -4,7 +4,13 @@ from types import SimpleNamespace
 import pytest
 
 from document_summariser.config import ProviderConfig
-from document_summariser.providers.base import AnthropicProvider, OpenAICompatibleProvider, ProviderError, RetryPolicy
+from document_summariser.providers.base import (
+    AnthropicProvider,
+    GeminiProvider,
+    OpenAICompatibleProvider,
+    ProviderError,
+    RetryPolicy,
+)
 from document_summariser.providers.registry import build_provider_registry
 
 
@@ -95,6 +101,125 @@ def test_anthropic_provider_passes_thinking_and_effort(monkeypatch):
     assert captured["max_tokens"] == 64000
     assert captured["thinking"] == {"type": "adaptive", "display": "omitted"}
     assert captured["output_config"] == {"effort": "xhigh"}
+
+
+def test_gemini_provider_passes_thinking_budget(monkeypatch):
+    captured: dict = {}
+
+    class FakeThinkingConfig:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    class FakeGenerateContentConfig:
+        def __init__(self, **kwargs):
+            captured["config_kwargs"] = kwargs
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(text="corrected text")
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured["client_kwargs"] = kwargs
+            self.models = FakeModels()
+
+    fake_types = SimpleNamespace(
+        GenerateContentConfig=FakeGenerateContentConfig,
+        ThinkingConfig=FakeThinkingConfig,
+    )
+    fake_genai = SimpleNamespace(Client=FakeClient, types=fake_types)
+    monkeypatch.setitem(sys.modules, "google", SimpleNamespace(genai=fake_genai))
+    monkeypatch.setitem(sys.modules, "google.genai", fake_genai)
+    monkeypatch.setitem(sys.modules, "google.genai.types", fake_types)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    provider = GeminiProvider(
+        id="gemini",
+        model="gemini-2.5-pro",
+        config=ProviderConfig(
+            id="gemini",
+            type="gemini",
+            model="gemini-2.5-pro",
+            api_key_env="GEMINI_API_KEY",
+            max_output_tokens=16384,
+            extra={"thinking_config": {"thinking_budget": 1024}},
+        ),
+        timeout_seconds=1,
+        retry_policy=RetryPolicy(attempts=1, initial_delay_seconds=0),
+    )
+
+    assert provider.generate("Correct this.") == "corrected text"
+    assert captured["model"] == "gemini-2.5-pro"
+    assert captured["config_kwargs"]["max_output_tokens"] == 16384
+    thinking_config = captured["config_kwargs"]["thinking_config"]
+    assert thinking_config.kwargs == {"thinking_budget": 1024}
+
+
+def test_gemini_provider_sends_image_attachments(monkeypatch, tmp_path):
+    captured: dict = {}
+    image_path = tmp_path / "page.png"
+    image_path.write_bytes(b"image-bytes")
+
+    class FakePart:
+        @classmethod
+        def from_text(cls, text):
+            return {"kind": "text", "text": text}
+
+        @classmethod
+        def from_bytes(cls, data, mime_type):
+            return {"kind": "bytes", "data": data, "mime_type": mime_type}
+
+    class FakeContent:
+        def __init__(self, role, parts):
+            self.role = role
+            self.parts = parts
+
+    class FakeGenerateContentConfig:
+        def __init__(self, **kwargs):
+            captured["config_kwargs"] = kwargs
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(text="corrected text")
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.models = FakeModels()
+
+    fake_types = SimpleNamespace(
+        Content=FakeContent,
+        GenerateContentConfig=FakeGenerateContentConfig,
+        Part=FakePart,
+    )
+    fake_genai = SimpleNamespace(Client=FakeClient, types=fake_types)
+    monkeypatch.setitem(sys.modules, "google", SimpleNamespace(genai=fake_genai))
+    monkeypatch.setitem(sys.modules, "google.genai", fake_genai)
+    monkeypatch.setitem(sys.modules, "google.genai.types", fake_types)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    provider = GeminiProvider(
+        id="gemini",
+        model="gemini-2.5-pro",
+        config=ProviderConfig(
+            id="gemini",
+            type="gemini",
+            model="gemini-2.5-pro",
+            api_key_env="GEMINI_API_KEY",
+        ),
+        timeout_seconds=1,
+        retry_policy=RetryPolicy(attempts=1, initial_delay_seconds=0),
+    )
+
+    assert provider.generate("Correct this.", attachments=[str(image_path)]) == "corrected text"
+    contents = captured["contents"]
+    assert len(contents) == 1
+    assert contents[0].role == "user"
+    assert contents[0].parts[0] == {"kind": "text", "text": "Correct this."}
+    assert contents[0].parts[1] == {
+        "kind": "bytes",
+        "data": b"image-bytes",
+        "mime_type": "image/png",
+    }
 
 
 def _provider_registry_config():

@@ -22,6 +22,8 @@ def test_master_config_loads():
     }
     assert config.providers["chatgpt"].model == "gpt-5.2"
     assert config.providers["gemini"].model == "gemini-2.5-pro"
+    assert config.providers["gemini"].max_output_tokens == 16384
+    assert config.providers["gemini"].extra == {"thinking_config": {"thinking_budget": 1024}}
     assert config.providers["grok"].type == "grok"
     assert config.providers["grok"].base_url == "https://api.x.ai/v1"
     assert config.providers["deepseek"].model == "deepseek-v4-pro"
