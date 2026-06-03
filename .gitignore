@@ -1,6 +1,12 @@
 .env
 .env.*
 !.env.example
+
+# Local Google Cloud credential files. Never commit service-account JSON.
+vision-ocr-*.json
+*service-account*.json
+*credentials*.json
+
 __pycache__/
 .pytest_cache/
 .ruff_cache/

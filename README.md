@@ -83,7 +83,7 @@ The canonical editable configuration lives in `config/master_config.yaml`.
 - OCR provider: Google Cloud Vision
 - Correction provider: Gemini
 - Summarisers: ChatGPT, Gemini, Grok, DeepSeek
-- Consolidator: Claude
+- Consolidator: Claude Opus 4.7 with adaptive thinking and `xhigh` effort
 - Output: right-to-left DOCX using `Noto Nastaliq Urdu`
 
 Provider credentials are read from environment variables named by each provider's `api_key_env`.

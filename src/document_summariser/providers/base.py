@@ -92,6 +92,10 @@ class AnthropicProvider(BaseCloudProvider):
         }
         if self.config.temperature is not None:
             kwargs["temperature"] = self.config.temperature
+        if self.config.extra:
+            for key in ("thinking", "output_config", "service_tier"):
+                if key in self.config.extra:
+                    kwargs[key] = self.config.extra[key]
 
         message = client.messages.create(**kwargs)
         return "\n".join(block.text for block in message.content if getattr(block, "type", None) == "text")

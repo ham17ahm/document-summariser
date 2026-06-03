@@ -14,11 +14,17 @@ def test_master_config_loads():
     assert config.summarisers == ["chatgpt", "gemini", "grok", "deepseek"]
     assert config.consolidator == "claude"
     assert config.ocr["provider"] == "google_cloud_vision"
-    assert config.providers["claude"].model == "claude-sonnet-4-20250514"
+    assert config.providers["claude"].model == "claude-opus-4-7"
+    assert config.providers["claude"].max_output_tokens == 64000
+    assert config.providers["claude"].extra == {
+        "thinking": {"type": "adaptive", "display": "omitted"},
+        "output_config": {"effort": "xhigh"},
+    }
     assert config.providers["chatgpt"].model == "gpt-5.2"
     assert config.providers["gemini"].model == "gemini-2.5-pro"
     assert config.providers["grok"].type == "grok"
     assert config.providers["grok"].base_url == "https://api.x.ai/v1"
+    assert config.providers["deepseek"].model == "deepseek-v4-pro"
     assert config.providers["deepseek"].type == "deepseek"
     assert Path(config.output["format_spec"]).exists()
 

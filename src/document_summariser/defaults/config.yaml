@@ -32,15 +32,20 @@ providers:
     max_output_tokens: 4096
   deepseek:
     type: deepseek
-    model: deepseek-v4-flash
+    model: deepseek-v4-pro
     api_key_env: DEEPSEEK_API_KEY
     base_url: https://api.deepseek.com
     max_output_tokens: 4096
   claude:
     type: anthropic
-    model: claude-sonnet-4-20250514
+    model: claude-opus-4-7
     api_key_env: ANTHROPIC_API_KEY
-    max_output_tokens: 4096
+    max_output_tokens: 64000
+    thinking:
+      type: adaptive
+      display: omitted
+    output_config:
+      effort: xhigh
 
 prompts:
   correction: prompts/correction.prompt.txt
