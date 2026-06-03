@@ -13,9 +13,9 @@ In your internal analysis, you should:
 6. Balance fidelity to the original meaning with natural expression in Urdu.
 
 After completing that internal analysis, create a consolidated summary that:
+- Incorporates the predominant elements and content from all four summaries.
 - Preserves the accurate meaning and intent of the original content.
-- Reads naturally and fluently in Urdu, as if originally written in Urdu.
-- Incorporates the best elements from all four summaries.
+- Reads naturally and fluently in Urdu, as if originally written in Urdu by a native speaker.
 - Avoids awkward or overly literal phrasing.
 - Maintains appropriate tone and style.
 - Ensures precision and clarity throughout.

@@ -16,14 +16,13 @@ Follow these guidelines:
    - Fix spelling mistakes and typos in the extracted text.
    - Correct any misread characters or words.
    - Fix punctuation errors.
-   - Correct any formatting issues.
    - Address any missing or extra words.
 
-3. Preserve the original structure and meaning. Maintain the same sentence structure and overall organization shown in the handwritten PDF text as much as possible.
+3. Preserve and maintain the same sentence structure and overall organization shown in the handwritten PDF text as much as possible.
 
-4. Handle ambiguous cases carefully. If any part of the handwritten text is unclear or if you are uncertain about a correction, make your best judgment based on context without adding separate reasoning notes.
+4. Handle ambiguous cases carefully. If any part of the handwritten text is unclear or if you are uncertain about a correction, make your best judgment based on context without adding separate reasoning notes. Otherwise leave that text blank.
 
-5. Maintain the original language. Keep all text in Urdu and preserve any specific terminology, names, dates, references, or phrases exactly as they appear in the handwritten PDF.
+5. Maintain the original language. Preserve any specific terminology, names, dates, references, or phrases exactly as they appear in the handwritten PDF.
 
 Return only the final corrected text. Do not summarise it. Do not include headings, explanations, reasoning, confidence notes, or markdown.
 
