@@ -108,7 +108,7 @@ Create a concise Urdu summary that narrates the main concerns and requests of th
 </example_summaries>
 
   <output_format>
-    <format>Plain Urdu text only in ONE paragraph.</format>
+    <format>Plain Urdu text only in ONE concise paragraph.</format>
     <length>6-9 sentences depending on complexity.</length>
     <style>Natural, conversational flow with clear focus on the crux.</style>
   </output_format>
