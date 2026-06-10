@@ -31,8 +31,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--publish-final",
         action="store_true",
         help=(
-            "Copy the final TXT to output.final_text_directory from the config "
-            "(defaults to beside the input PDF) and print its path. Single PDF only."
+            "Copy each final TXT to output.final_text_directory from the config "
+            "(defaults to beside the input PDF) and print its path."
         ),
     )
     parser.add_argument(
@@ -75,14 +75,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.final_text:
         print("Error: --final-text cannot be used with multiple input PDFs.", file=sys.stderr)
         return 1
-    if args.publish_final:
-        print("Error: --publish-final cannot be used with multiple input PDFs.", file=sys.stderr)
-        return 1
 
-    return _run_concurrent(args.pdf, args.config, args.out, debug, args.parallel)
+    return _run_concurrent(args.pdf, args.config, args.out, debug, args.parallel, args.publish_final)
 
 
-def _run_concurrent(pdf_paths: list[str], config: str, out: str | None, debug: bool, parallel: int) -> int:
+def _run_concurrent(
+    pdf_paths: list[str],
+    config: str,
+    out: str | None,
+    debug: bool,
+    parallel: int,
+    publish_final: bool = False,
+) -> int:
     any_failed = False
     # Each pipeline already fans out its own summariser threads; running every
     # PDF at once multiplies that into a rate-limit storm against shared keys.
@@ -97,6 +101,8 @@ def _run_concurrent(pdf_paths: list[str], config: str, out: str | None, debug: b
             label = Path(path).name
             try:
                 result = future.result()
+                if publish_final:
+                    print(f"[{label}] {publish_final_text(result)}")
                 print(f"[{label}] Wrote run artifacts to {result.artifacts.root}")
             except Exception as exc:  # noqa: BLE001 - report per-PDF failures without stopping others
                 any_failed = True
