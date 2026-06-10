@@ -2,25 +2,37 @@ You will be analysing four different summaries of the same content and consolida
 
 Your goal is to create a final summary that accurately conveys the original meaning while reading naturally and fluently in Urdu, avoiding overly literal phrasing.
 
-Before deciding on the final consolidated summary, carefully analyse all four summaries internally.
+<internal_analysis>
+Before writing the final consolidated summary, carefully analyse all four summaries internally. Do not output this analysis. In your internal analysis:
 
-In your internal analysis, you should:
 1. Compare the four summaries side by side, examining how each handles specific phrases, idioms, and concepts.
-2. Identify the strengths of each summary, such as natural phrasing, accurate terminology, better flow, and cultural appropriateness.
-3. Identify the weaknesses of each summary, such as awkward phrasing, overly literal rendering, loss of nuance, or inaccuracies.
-4. Note where the summaries differ significantly and determine which approach best captures the original meaning.
-5. Consider which word choices, sentence structures, and stylistic elements from each summary should be incorporated into the final version.
+2. Identify the content that is common across all or most of the summaries — this shared core must form the backbone of the final summary.
+3. Identify the strengths of each summary, such as natural phrasing, accurate terminology, better flow, and cultural appropriateness, and select the single best rendering of each idea from among the four versions.
+4. Identify the weaknesses of each summary, such as awkward phrasing, overly literal rendering, loss of nuance, or inaccuracies, and exclude these from the final version.
+5. Where the summaries differ significantly, determine which approach best captures the original meaning and adopt that one; do not blend contradictory versions of the same point.
 6. Balance fidelity to the original meaning with natural expression in Urdu.
+</internal_analysis>
 
-After completing that internal analysis, create a consolidated summary that:
-- Incorporates the predominant elements and content from all four summaries.
-- Preserves the accurate meaning and intent of the original content.
-- Reads naturally and fluently in Urdu, as if originally written in Urdu by a native speaker.
+<consolidation_requirements>
+After completing the internal analysis, create one consolidated summary that:
+
+- Is built around the elements common to the four summaries, choosing the best available wording for each, so that the result reads as the strongest single version rather than a patchwork.
+- Preserves the accurate meaning and intent of the original content; do not add information that does not appear in the summaries, and do not drop any substantive point that the summaries share.
+- Reads naturally and fluently in Urdu, as if originally written by a native Urdu speaker.
 - Avoids awkward or overly literal phrasing.
-- Maintains appropriate tone and style.
+- Maintains the tone, register, and perspective (e.g. first person) of the source summaries.
 - Ensures precision and clarity throughout.
+</consolidation_requirements>
 
-Return only the consolidated Urdu summary. Do not output your analysis, headings, XML tags, explanatory notes, provider names, or commentary.
+<output_format>
+These formatting rules are strict and must be followed exactly:
+
+- Write the consolidated summary as ONE single, comprehensive, flowing paragraph. Only if the content covers two genuinely distinct subjects that cannot be joined naturally may you use two paragraphs — two is the absolute maximum. Never produce three or more paragraphs.
+- Do not use headings, bullet points, numbered lists, line breaks within a paragraph, or any other formatting devices — plain continuous Urdu prose only.
+- Return only the consolidated Urdu summary itself. Do not output your analysis, reasoning, headings, XML tags, explanatory notes, provider names, labels, or any commentary before or after the summary.
+
+Within these strict formatting constraints, you have linguistic flexibility: you are not required to copy any summary word for word, and you may rephrase, reorder, and merge sentences as needed to achieve the most natural and faithful Urdu rendering.
+</output_format>
 
 Here are the four summaries to analyse:
 

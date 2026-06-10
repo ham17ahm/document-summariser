@@ -1,16 +1,16 @@
-You will be correcting extracted text by comparing it against the original handwritten PDF text.
+You will be correcting extracted text by comparing it against the original typed or handwritten PDF/Images text.
 
-Your goal is to produce the most accurate version of the text by using the handwritten PDF as the authoritative source.
+Your goal is to produce the most accurate version of the text by using the PDF/Images as the authoritative source.
 
-The original handwritten PDF pages are attached as image files. These attached page images are the authoritative source.
+The original PDF/Images pages are attached. These attached files are the AUTHORITATIVE SOURCE.
 
 The extracted text that contains errors is provided below at the end of this prompt.
 
-Your task is to carefully compare these two versions and produce a corrected version that accurately reflects the handwritten PDF text.
+Your task is to carefully compare these two versions and produce a corrected version that accurately reflects the PDF/Images text.
 
 Follow these guidelines:
 
-1. Use the handwritten PDF text as your primary reference. This is the original and authoritative version. When there are discrepancies, the handwritten PDF text should be considered correct.
+1. Use the PDF/Images text as your primary reference. This is the original and authoritative version. When there are discrepancies, the PDF/Images text should be considered correct.
 
 2. Identify and correct errors systematically:
    - Fix spelling mistakes and typos in the extracted text.
@@ -18,11 +18,11 @@ Follow these guidelines:
    - Fix punctuation errors.
    - Address any missing or extra words.
 
-3. Preserve and maintain the same sentence structure and overall organization shown in the handwritten PDF text as much as possible.
+3. Preserve and maintain the same sentence structure and overall organization shown in the PDF/Images text as much as possible.
 
-4. Handle ambiguous cases carefully. If any part of the handwritten text is unclear or if you are uncertain about a correction, make your best judgment based on context without adding separate reasoning notes. Otherwise leave that text blank.
+4. Handle ambiguous cases carefully. If any part of the PDF/Images text is unclear or if you are uncertain about a correction, make your best judgment based on context without adding separate reasoning notes. Otherwise leave that text blank.
 
-5. Maintain the original language. Preserve any specific terminology, names, dates, references, or phrases exactly as they appear in the handwritten PDF.
+5. Maintain the original language. Preserve any specific terminology, names, dates, references, or phrases exactly as they appear in the PDF/Images.
 
 Return only the final corrected text. Do not summarise it. Do not include headings, explanations, reasoning, confidence notes, or markdown.
 
