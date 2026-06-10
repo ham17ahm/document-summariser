@@ -27,7 +27,7 @@ After completing the internal analysis, create one consolidated summary that:
 <output_format>
 These formatting rules are strict and must be followed exactly:
 
-- Write the consolidated summary as ONE single, comprehensive, flowing paragraph. Only if the content covers two genuinely distinct subjects that cannot be joined naturally may you use two paragraphs — two is the absolute maximum. Never produce three or more paragraphs.
+- Write the consolidated summary as ONE single, comprehensive, flowing paragraph.
 - Do not use headings, bullet points, numbered lists, line breaks within a paragraph, or any other formatting devices — plain continuous Urdu prose only.
 - Return only the consolidated Urdu summary itself. Do not output your analysis, reasoning, headings, XML tags, explanatory notes, provider names, labels, or any commentary before or after the summary.
 
