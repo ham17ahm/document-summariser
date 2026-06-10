@@ -5,12 +5,9 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from document_summariser.errors import ConfigError
+import yaml
 
-try:
-    import yaml
-except ModuleNotFoundError:  # pragma: no cover - exercised when dependencies are not installed
-    yaml = None
+from document_summariser.errors import ConfigError
 
 
 @dataclass(frozen=True)
@@ -56,10 +53,7 @@ def load_config(path: str | Path | None = None) -> AppConfig:
     source_path = Path(path).expanduser().resolve() if path is not None else default_config_path()
     try:
         with source_path.open("r", encoding="utf-8") as handle:
-            if yaml is not None:
-                raw = yaml.safe_load(handle) or {}
-            else:
-                raw = _simple_yaml_load(handle.read())
+            raw = yaml.safe_load(handle) or {}
     except OSError as exc:
         raise ConfigError(
             "Could not read config file.",
@@ -239,42 +233,3 @@ def _resolve_path(base: Path, value: str) -> Path:
         if resolved.exists():
             return resolved
     return (base / path).resolve()
-
-
-def _simple_yaml_load(text: str) -> dict[str, Any]:
-    """Parse the small YAML subset used by the default config.
-
-    This keeps the CLI smoke-testable before project dependencies are installed.
-    Install PyYAML for full YAML support.
-    """
-    root: dict[str, Any] = {}
-    stack: list[tuple[int, dict[str, Any]]] = [(-1, root)]
-    for raw_line in text.splitlines():
-        line = raw_line.split("#", 1)[0].rstrip()
-        if not line.strip():
-            continue
-        indent = len(line) - len(line.lstrip(" "))
-        key, _, value = line.strip().partition(":")
-        while stack and indent <= stack[-1][0]:
-            stack.pop()
-        current = stack[-1][1]
-        if value.strip() == "":
-            nested: dict[str, Any] = {}
-            current[key] = nested
-            stack.append((indent, nested))
-        else:
-            current[key] = _parse_scalar(value.strip())
-    return root
-
-
-def _parse_scalar(value: str) -> Any:
-    if value.startswith("[") and value.endswith("]"):
-        items = value[1:-1].strip()
-        if not items:
-            return []
-        return [_parse_scalar(item.strip()) for item in items.split(",")]
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-        return value[1:-1]
-    if value.isdigit():
-        return int(value)
-    return value

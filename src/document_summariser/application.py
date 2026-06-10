@@ -6,6 +6,7 @@ from pathlib import Path
 
 from document_summariser.artifacts import ArtifactStore
 from document_summariser.config import AppConfig, load_config
+from document_summariser.errors import ConfigError
 from document_summariser.ocr import build_ocr_adapter
 from document_summariser.providers.registry import build_provider_registry
 from document_summariser.stages import Pipeline
@@ -27,6 +28,7 @@ def run_document_summary(
     output_dir: str | Path | None = None,
 ) -> SummaryRunResult:
     config = load_config(config_path)
+    _preflight_check(config)
     input_pdf = Path(pdf_path).expanduser().resolve()
     artifacts = ArtifactStore.create(_resolve_output_dir(config, output_dir), input_pdf)
 
@@ -47,6 +49,35 @@ def run_document_summary(
         context=context,
         output_text_path=artifacts.root / "05_output.txt",
     )
+
+
+def _preflight_check(config: AppConfig) -> None:
+    """Fail before OCR starts if any pipeline provider cannot possibly succeed.
+
+    Without this, a missing consolidator key is only discovered after OCR,
+    correction, and all summaries have already run and been paid for.
+    """
+    pipeline_provider_ids = dict.fromkeys(
+        [config.correction_provider, *config.summarisers, config.consolidator]
+    )
+    missing_keys: dict[str, str] = {}
+    for provider_id in pipeline_provider_ids:
+        provider = config.providers[provider_id]
+        if provider.type == "mock":
+            continue
+        if not provider.api_key_env:
+            raise ConfigError(
+                f"Provider {provider_id!r} is missing api_key_env in config.",
+                details={"config_file": str(config.source_path), "provider": provider_id},
+            )
+        if not os.environ.get(provider.api_key_env):
+            missing_keys[provider_id] = provider.api_key_env
+    if missing_keys:
+        raise ConfigError(
+            "Missing API keys for providers: "
+            + ", ".join(f"{provider_id} (set {env})" for provider_id, env in missing_keys.items()),
+            details={"config_file": str(config.source_path), "required_env_vars": missing_keys},
+        )
 
 
 def _resolve_output_dir(config: AppConfig, output_dir: str | Path | None) -> str | Path:

@@ -4,8 +4,10 @@ from types import SimpleNamespace
 import pytest
 
 from document_summariser.config import ProviderConfig
+from document_summariser.errors import ConfigError
 from document_summariser.providers.base import (
     AnthropicProvider,
+    BaseCloudProvider,
     GeminiProvider,
     OpenAICompatibleProvider,
     ProviderError,
@@ -31,6 +33,84 @@ def test_cloud_provider_requires_configured_api_key(monkeypatch):
 
     with pytest.raises(ProviderError, match="OPENAI_API_KEY"):
         provider.generate("Summarise this.")
+
+
+def test_retry_skips_non_retryable_errors():
+    calls = {"count": 0}
+
+    class FailingProvider(BaseCloudProvider):
+        def _generate_once(self, prompt: str) -> str:
+            calls["count"] += 1
+            raise ProviderError("bad request", retryable=False)
+
+    provider = FailingProvider(
+        id="p",
+        model="m",
+        config=ProviderConfig(id="p", type="openai", model="m"),
+        timeout_seconds=1,
+        retry_policy=RetryPolicy(attempts=3, initial_delay_seconds=0),
+    )
+
+    with pytest.raises(ProviderError, match="bad request"):
+        provider.generate("Summarise this.")
+    assert calls["count"] == 1
+
+
+def test_retry_retries_transient_errors():
+    calls = {"count": 0}
+
+    class FlakyProvider(BaseCloudProvider):
+        def _generate_once(self, prompt: str) -> str:
+            calls["count"] += 1
+            if calls["count"] < 2:
+                raise RuntimeError("transient network error")
+            return "ok"
+
+    provider = FlakyProvider(
+        id="p",
+        model="m",
+        config=ProviderConfig(id="p", type="openai", model="m"),
+        timeout_seconds=1,
+        retry_policy=RetryPolicy(attempts=3, initial_delay_seconds=0),
+    )
+
+    assert provider.generate("Summarise this.") == "ok"
+    assert calls["count"] == 2
+
+
+def test_retry_skips_non_retryable_http_status():
+    calls = {"count": 0}
+
+    class BadRequestError(Exception):
+        status_code = 400
+
+    class FailingProvider(BaseCloudProvider):
+        def _generate_once(self, prompt: str) -> str:
+            calls["count"] += 1
+            raise BadRequestError("invalid request")
+
+    provider = FailingProvider(
+        id="p",
+        model="m",
+        config=ProviderConfig(id="p", type="openai", model="m"),
+        timeout_seconds=1,
+        retry_policy=RetryPolicy(attempts=3, initial_delay_seconds=0),
+    )
+
+    with pytest.raises(ProviderError, match="invalid request"):
+        provider.generate("Summarise this.")
+    assert calls["count"] == 1
+
+
+def test_registry_rejects_unknown_provider_type():
+    class Config:
+        runtime = {"retries": 1, "request_timeout_seconds": 1}
+        providers = {
+            "watson": ProviderConfig(id="watson", type="watson", model="watson-test"),
+        }
+
+    with pytest.raises(ConfigError, match="watson"):
+        build_provider_registry(Config())
 
 
 def test_registry_builds_deepseek_as_openai_compatible_provider():
@@ -150,9 +230,54 @@ def test_gemini_provider_passes_thinking_budget(monkeypatch):
 
     assert provider.generate("Correct this.") == "corrected text"
     assert captured["model"] == "gemini-2.5-pro"
+    assert captured["client_kwargs"]["http_options"] == {"timeout": 1000}
     assert captured["config_kwargs"]["max_output_tokens"] == 16384
     thinking_config = captured["config_kwargs"]["thinking_config"]
     assert thinking_config.kwargs == {"thinking_budget": 1024}
+
+
+def test_gemini_provider_rejects_truncated_response(monkeypatch):
+    calls = {"count": 0}
+
+    class FakeGenerateContentConfig:
+        def __init__(self, **kwargs):
+            pass
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            calls["count"] += 1
+            return SimpleNamespace(
+                text="partial output",
+                candidates=[SimpleNamespace(finish_reason="FinishReason.MAX_TOKENS")],
+            )
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.models = FakeModels()
+
+    fake_types = SimpleNamespace(GenerateContentConfig=FakeGenerateContentConfig)
+    fake_genai = SimpleNamespace(Client=FakeClient, types=fake_types)
+    monkeypatch.setitem(sys.modules, "google", SimpleNamespace(genai=fake_genai))
+    monkeypatch.setitem(sys.modules, "google.genai", fake_genai)
+    monkeypatch.setitem(sys.modules, "google.genai.types", fake_types)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    provider = GeminiProvider(
+        id="gemini",
+        model="gemini-2.5-pro",
+        config=ProviderConfig(
+            id="gemini",
+            type="gemini",
+            model="gemini-2.5-pro",
+            api_key_env="GEMINI_API_KEY",
+            max_output_tokens=16384,
+        ),
+        timeout_seconds=1,
+        retry_policy=RetryPolicy(attempts=3, initial_delay_seconds=0),
+    )
+
+    with pytest.raises(ProviderError, match="max_output_tokens"):
+        provider.generate("Correct this.")
+    assert calls["count"] == 1
 
 
 def test_gemini_provider_sends_image_attachments(monkeypatch, tmp_path):

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from document_summariser.config import AppConfig, ProviderConfig
+from document_summariser.errors import ConfigError
 from document_summariser.providers.base import (
     AnthropicProvider,
     BaseCloudProvider,
@@ -11,7 +12,6 @@ from document_summariser.providers.base import (
     OpenAICompatibleProvider,
     ProviderAdapter,
     RetryPolicy,
-    UnsupportedProvider,
 )
 
 ProviderFactory = type[BaseCloudProvider]
@@ -97,11 +97,13 @@ def build_provider_registry(config: AppConfig) -> dict[str, ProviderAdapter]:
     for provider_id, provider in config.providers.items():
         factory = PROVIDER_FACTORIES.get(provider.type)
         if factory is None:
-            registry[provider_id] = UnsupportedProvider(
-                id=provider_id,
-                model=provider.model,
-                provider_type=provider.type,
+            raise ConfigError(
+                f"Unsupported provider type {provider.type!r} for provider {provider_id!r}.",
+                details={
+                    "provider": provider_id,
+                    "provider_type": provider.type,
+                    "supported_types": sorted(PROVIDER_FACTORIES),
+                },
             )
-        else:
-            registry[provider_id] = factory(provider, timeout_seconds, retry_policy)
+        registry[provider_id] = factory(provider, timeout_seconds, retry_policy)
     return registry

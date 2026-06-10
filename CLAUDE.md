@@ -32,6 +32,8 @@ The app flow is:
 9. Write final Urdu output as plain UTF-8 text.
 10. Write intermediate artifacts and `manifest.json`.
 
+Before step 1, `application.py` runs a preflight check: every provider used by the pipeline must have its `api_key_env` configured and present in the environment, and the provider registry rejects unknown provider types at startup. Failures raise `ConfigError` before any OCR cost is incurred.
+
 Canonical editable config:
 
 ```text
@@ -48,7 +50,7 @@ Final output is text only. Do not reintroduce DOCX output or `python-docx` unles
 summarise_pdf.py
 ```
 
-Simple runner that writes the final `.txt` beside the input PDF.
+Simple runner that writes the final `.txt` beside the input PDF (or `output.final_text_directory`). Thin shim that forwards to `cli.main` with `--publish-final`.
 
 ```text
 src/document_summariser/cli.py
@@ -204,6 +206,12 @@ thinking_config.thinking_budget: 1024
 
 These settings fixed a previous Gemini issue where the model spent the output budget on thinking tokens. Do not reduce or remove them without a specific reason.
 
+Provider retry and timeout behaviour:
+
+- `ProviderError` carries a `retryable` flag. Auth/config/missing-SDK errors and HTTP 400/401/403/404/422 fail fast; 429/5xx/timeouts/empty responses retry with exponential backoff via the shared `BaseCloudProvider._run_with_retry`.
+- `runtime.request_timeout_seconds` applies to all providers, including Gemini (passed as `http_options={"timeout": <milliseconds>}`).
+- Gemini raises a non-retryable error when a response finishes with `MAX_TOKENS` (truncation guard), and the pipeline records a `correction_warning` in the manifest when corrected text is under half the OCR text length.
+
 Prompt rules:
 
 - Keep prompt text in prompt files.
@@ -271,7 +279,7 @@ summarise --help
 Expected current test result:
 
 ```text
-18 passed
+32 passed
 ```
 
 On Windows/sandbox setups, pytest may need to run outside the sandbox because temp directories can receive ACLs the sandbox cannot scan.

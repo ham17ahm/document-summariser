@@ -92,6 +92,7 @@ class ProviderError(DocumentSummariserError):
         *,
         details: dict[str, Any] | None = None,
         cause: BaseException | None = None,
+        retryable: bool = True,
     ) -> None:
         super().__init__(
             message=message,
@@ -99,6 +100,9 @@ class ProviderError(DocumentSummariserError):
             details=details or {},
             cause=cause,
         )
+        # Retrying cannot fix config/auth/validation failures; the retry loop
+        # in BaseCloudProvider checks this flag to fail fast on those.
+        self.retryable = retryable
 
 
 class PipelineStageError(DocumentSummariserError):

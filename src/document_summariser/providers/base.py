@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 import os
 from time import sleep
@@ -7,6 +8,31 @@ from typing import Protocol
 
 from document_summariser.config import ProviderConfig
 from document_summariser.errors import ProviderError
+
+# Client errors that retrying cannot fix (bad request, auth, not found,
+# unprocessable). Rate limits (429) and server errors (5xx) stay retryable.
+_NON_RETRYABLE_STATUS_CODES = {400, 401, 403, 404, 422}
+
+
+def _http_status(exc: BaseException) -> int | None:
+    for attr in ("status_code", "code"):
+        value = getattr(exc, attr, None)
+        if isinstance(value, int) and 100 <= value < 600:
+            return value
+    response = getattr(exc, "response", None)
+    value = getattr(response, "status_code", None)
+    if isinstance(value, int) and 100 <= value < 600:
+        return value
+    return None
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    if isinstance(exc, ProviderError):
+        return exc.retryable
+    status = _http_status(exc)
+    if status is not None:
+        return status not in _NON_RETRYABLE_STATUS_CODES
+    return True
 
 
 class ProviderAdapter(Protocol):
@@ -49,27 +75,34 @@ class BaseCloudProvider:
             raise ProviderError(
                 f"{self.id} does not support attachments in this pipeline.",
                 details=self._error_details(attachment_count=len(attachments)),
+                retryable=False,
             )
+        return self._run_with_retry(lambda: self._generate_once(prompt))
 
+    def _run_with_retry(self, call: Callable[[], str], **extra_details: object) -> str:
         last_error: Exception | None = None
+        attempts_made = 0
         for attempt in range(1, self.retry_policy.attempts + 1):
+            attempts_made = attempt
             try:
-                text = self._generate_once(prompt)
+                text = call()
                 if not text.strip():
                     raise ProviderError(
                         f"{self.id} returned an empty response.",
-                        details=self._error_details(attempt=attempt),
+                        details=self._error_details(attempt=attempt, **extra_details),
                     )
                 return text
             except Exception as exc:  # noqa: BLE001 - provider SDKs expose different exception classes
                 last_error = exc
-                if attempt >= self.retry_policy.attempts:
+                if not _is_retryable(exc) or attempt >= self.retry_policy.attempts:
                     break
                 sleep(self.retry_policy.initial_delay_seconds * (2 ** (attempt - 1)))
 
+        if isinstance(last_error, ProviderError) and not last_error.retryable:
+            raise last_error
         raise ProviderError(
-            f"{self.id} failed after {self.retry_policy.attempts} attempts: {last_error}",
-            details=self._error_details(attempts=self.retry_policy.attempts),
+            f"{self.id} failed after {attempts_made} attempt(s): {last_error}",
+            details=self._error_details(attempts=attempts_made, **extra_details),
             cause=last_error,
         ) from last_error
 
@@ -82,12 +115,14 @@ class BaseCloudProvider:
             raise ProviderError(
                 f"Provider {self.id!r} is missing api_key_env in config.",
                 details=self._error_details(),
+                retryable=False,
             )
         value = os.environ.get(env_name)
         if not value:
             raise ProviderError(
                 f"Missing API key for provider {self.id!r}. Set {env_name}.",
                 details=self._error_details(api_key_env=env_name),
+                retryable=False,
             )
         return value
 
@@ -111,6 +146,7 @@ class AnthropicProvider(BaseCloudProvider):
                 "Install the 'anthropic' package to use Anthropic providers.",
                 details=self._error_details(),
                 cause=exc,
+                retryable=False,
             ) from exc
 
         client = Anthropic(api_key=self._api_key(), timeout=self.timeout_seconds)
@@ -142,6 +178,7 @@ class OpenAICompatibleProvider(BaseCloudProvider):
                 "Install the 'openai' package to use OpenAI-compatible providers.",
                 details=self._error_details(),
                 cause=exc,
+                retryable=False,
             ) from exc
 
         client_kwargs = {"api_key": self._api_key(), "timeout": self.timeout_seconds}
@@ -168,36 +205,10 @@ class GeminiProvider(BaseCloudProvider):
     supports_attachments: bool = True
 
     def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
-        return self._generate_with_retry(prompt, attachments)
-
-    def _generate_with_retry(self, prompt: str, attachments: list[str] | None = None) -> str:
-        last_error: Exception | None = None
-        for attempt in range(1, self.retry_policy.attempts + 1):
-            try:
-                text = self._generate_once(prompt, attachments)
-                if not text.strip():
-                    raise ProviderError(
-                        f"{self.id} returned an empty response.",
-                        details=self._error_details(
-                            attempt=attempt,
-                            attachment_count=len(attachments or []),
-                        ),
-                    )
-                return text
-            except Exception as exc:  # noqa: BLE001 - provider SDKs expose different exception classes
-                last_error = exc
-                if attempt >= self.retry_policy.attempts:
-                    break
-                sleep(self.retry_policy.initial_delay_seconds * (2 ** (attempt - 1)))
-
-        raise ProviderError(
-            f"{self.id} failed after {self.retry_policy.attempts} attempts: {last_error}",
-            details=self._error_details(
-                attempts=self.retry_policy.attempts,
-                attachment_count=len(attachments or []),
-            ),
-            cause=last_error,
-        ) from last_error
+        return self._run_with_retry(
+            lambda: self._generate_once(prompt, attachments),
+            attachment_count=len(attachments or []),
+        )
 
     def _generate_once(self, prompt: str, attachments: list[str] | None = None) -> str:
         try:
@@ -208,9 +219,14 @@ class GeminiProvider(BaseCloudProvider):
                 "Install the 'google-genai' package to use Gemini providers.",
                 details=self._error_details(attachment_count=len(attachments or [])),
                 cause=exc,
+                retryable=False,
             ) from exc
 
-        client = genai.Client(api_key=self._api_key())
+        # google-genai expects the request timeout in milliseconds.
+        client = genai.Client(
+            api_key=self._api_key(),
+            http_options={"timeout": int(self.timeout_seconds * 1000)},
+        )
         config_kwargs = {}
         if self.config.max_output_tokens is not None:
             config_kwargs["max_output_tokens"] = self.config.max_output_tokens
@@ -235,6 +251,22 @@ class GeminiProvider(BaseCloudProvider):
             contents=contents,
             config=types.GenerateContentConfig(**config_kwargs) if config_kwargs else None,
         )
+        finish_reasons = [
+            str(getattr(candidate, "finish_reason", "unknown"))
+            for candidate in getattr(response, "candidates", []) or []
+        ]
+        # A MAX_TOKENS finish means the output was cut off mid-text; a truncated
+        # correction would silently poison every downstream summary.
+        if any("MAX_TOKENS" in reason for reason in finish_reasons):
+            raise ProviderError(
+                f"{self.id} hit max_output_tokens and returned a truncated response. "
+                "Increase max_output_tokens or lower thinking_config.thinking_budget.",
+                details=self._error_details(
+                    finish_reasons=finish_reasons,
+                    attachment_count=len(attachments or []),
+                ),
+                retryable=False,
+            )
         if getattr(response, "text", None):
             return response.text
 
@@ -258,30 +290,12 @@ class GeminiProvider(BaseCloudProvider):
             diagnostics.append(
                 f"usage(prompt={prompt_tokens}, thoughts={thoughts_tokens}, total={total_tokens})"
             )
-        finish_reasons = [
-            str(getattr(candidate, "finish_reason", "unknown"))
-            for candidate in getattr(response, "candidates", []) or []
-        ]
         if finish_reasons:
             diagnostics.append(f"finish_reasons={finish_reasons}")
         raise ProviderError(
             f"{self.id} returned no text"
             + (f" ({'; '.join(diagnostics)})" if diagnostics else "."),
             details=self._error_details(attachment_count=len(attachments or [])),
-        )
-
-
-@dataclass
-class UnsupportedProvider:
-    id: str
-    model: str
-    provider_type: str
-    supports_attachments: bool = False
-
-    def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
-        raise ProviderError(
-            f"Unsupported provider type {self.provider_type!r} for {self.id!r}.",
-            details={"provider": self.id, "provider_type": self.provider_type, "model": self.model},
         )
 
 

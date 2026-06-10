@@ -7,7 +7,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from document_summariser.application import run_document_summary
+from document_summariser.application import SummaryRunResult, run_document_summary
 from document_summariser.config import preferred_config_path
 from document_summariser.env import load_local_env
 from document_summariser.errors import print_cli_error
@@ -26,6 +26,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--final-text",
         default=None,
         help="Optional path for a copy of the final TXT output. Single PDF only.",
+    )
+    parser.add_argument(
+        "--publish-final",
+        action="store_true",
+        help=(
+            "Copy the final TXT to output.final_text_directory from the config "
+            "(defaults to beside the input PDF) and print its path. Single PDF only."
+        ),
+    )
+    parser.add_argument(
+        "--parallel",
+        type=int,
+        default=2,
+        help="Maximum number of PDFs to process concurrently when multiple PDFs are given.",
     )
     parser.add_argument(
         "--debug-errors",
@@ -51,6 +65,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.final_text:
                 final_text = copy_final_text(result.output_text_path, Path(args.final_text))
                 print(f"Wrote final TXT to {final_text}")
+            if args.publish_final:
+                print(publish_final_text(result))
             print(f"Wrote run artifacts to {result.artifacts.root}")
             return 0
         except Exception as exc:  # noqa: BLE001 - CLI boundary must render all runtime failures
@@ -59,13 +75,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.final_text:
         print("Error: --final-text cannot be used with multiple input PDFs.", file=sys.stderr)
         return 1
+    if args.publish_final:
+        print("Error: --publish-final cannot be used with multiple input PDFs.", file=sys.stderr)
+        return 1
 
-    return _run_concurrent(args.pdf, args.config, args.out, debug)
+    return _run_concurrent(args.pdf, args.config, args.out, debug, args.parallel)
 
 
-def _run_concurrent(pdf_paths: list[str], config: str, out: str | None, debug: bool) -> int:
+def _run_concurrent(pdf_paths: list[str], config: str, out: str | None, debug: bool, parallel: int) -> int:
     any_failed = False
-    with ThreadPoolExecutor(max_workers=len(pdf_paths)) as executor:
+    # Each pipeline already fans out its own summariser threads; running every
+    # PDF at once multiplies that into a rate-limit storm against shared keys.
+    max_workers = max(1, min(parallel, len(pdf_paths)))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(run_document_summary, path, config, out): path
             for path in pdf_paths
@@ -88,6 +110,16 @@ def copy_final_text(source: Path, destination: Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, destination)
     return destination
+
+
+def publish_final_text(result: SummaryRunResult) -> Path:
+    final_dir = Path(
+        result.config.output.get("final_text_directory", result.input_pdf.parent)
+    ).expanduser()
+    return copy_final_text(
+        result.output_text_path,
+        final_dir / result.input_pdf.with_suffix(".txt").name,
+    )
 
 
 if __name__ == "__main__":

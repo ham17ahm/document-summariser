@@ -81,6 +81,19 @@ class Pipeline:
         )
         context.corrected_text = corrected
         context.artifacts.write_text("02_corrected.txt", corrected)
+        # Correction should roughly preserve length; a much shorter result
+        # usually means the provider truncated its output.
+        ocr_characters = len(context.ocr_text.strip())
+        corrected_characters = len(corrected.strip())
+        if ocr_characters and corrected_characters < 0.5 * ocr_characters:
+            context.manifest["correction_warning"] = {
+                "reason": (
+                    "Corrected text is much shorter than the OCR text; "
+                    "the correction output may be truncated."
+                ),
+                "ocr_characters": ocr_characters,
+                "corrected_characters": corrected_characters,
+            }
         context.manifest.setdefault("prompts", {})["correction"] = {
             "path": str(prompt.path),
             "sha256": prompt.sha256,

@@ -124,6 +124,34 @@ def test_pipeline_skips_ocr_page_images_for_text_only_correction_provider(tmp_pa
     }
 
 
+def test_pipeline_warns_when_correction_is_suspiciously_short(tmp_path):
+    pdf = tmp_path / "sample.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n% placeholder\n")
+    config = load_config(_write_order_config(tmp_path))
+    artifacts = ArtifactStore(tmp_path / "run")
+    long_ocr_text = "This is a long page of OCR text. " * 50
+
+    context = RunContext(
+        input_pdf=pdf,
+        config=config,
+        artifacts=artifacts,
+        ocr=StaticOcrAdapter(None, text=long_ocr_text),
+        providers={
+            "corrector": StaticProvider("corrector", "test-model", "short"),
+            "slow": StaticProvider("slow", "test-model", "slow summary"),
+            "fast": StaticProvider("fast", "test-model", "fast summary"),
+            "consolidator": StaticProvider("consolidator", "test-model", "final summary"),
+        },
+        manifest={"input_file": str(pdf), "config_file": str(config.source_path)},
+    )
+
+    Pipeline().run(context)
+
+    warning = context.manifest["correction_warning"]
+    assert warning["corrected_characters"] == len("short")
+    assert warning["ocr_characters"] == len(long_ocr_text.strip())
+
+
 class StaticProvider:
     def __init__(
         self,
@@ -164,8 +192,9 @@ class RecordingProvider(StaticProvider):
 
 
 class StaticOcrAdapter:
-    def __init__(self, image_path: str) -> None:
+    def __init__(self, image_path: str | None, text: str = "OCR text") -> None:
         self.image_path = image_path
+        self.text = text
 
     def extract(self, pdf_path: Path, artifacts: ArtifactStore) -> OcrResult:
         return OcrResult(
@@ -173,7 +202,7 @@ class StaticOcrAdapter:
             pages=[
                 OcrPage(
                     page_number=1,
-                    text="OCR text",
+                    text=self.text,
                     confidence=None,
                     low_confidence=False,
                     image_path=self.image_path,
