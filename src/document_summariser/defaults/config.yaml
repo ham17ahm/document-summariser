@@ -54,6 +54,9 @@ prompts:
   summarise: prompts/summarise.prompt.txt
   consolidate: prompts/consolidate.prompt.txt
 
+prompt_sets:
+  directory: prompts/sets
+
 output:
   format: txt
   final_text_directory: 'C:\Users\Hamad.Mobeen\Downloads'

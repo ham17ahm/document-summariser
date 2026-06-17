@@ -31,6 +31,7 @@ where = ["src"]
 document_summariser = [
   "defaults/config.yaml",
   "defaults/prompts/*.txt",
+  "defaults/prompts/sets/default/*.txt",
 ]
 
 [tool.pytest.ini_options]

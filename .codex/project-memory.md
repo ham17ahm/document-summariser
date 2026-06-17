@@ -11,17 +11,18 @@ This repo is a Python CLI app for PDF OCR, Urdu summarisation, multi-provider co
 
 ## Current App Flow
 
-1. Validate input PDF.
-2. Render PDF pages to PNG with PyMuPDF and save them under `page_images/`.
-3. Run Google Cloud Vision document OCR.
-4. Correct OCR text using the configured correction provider. The correction stage passes the OCR text plus rendered page images to Gemini so it can compare OCR against the handwritten source.
-5. Summarise corrected text in parallel with ChatGPT, Gemini, Grok, and DeepSeek.
-6. Require at least `pipeline.min_summaries` successful summaries. The current master config requires all four.
-7. Consolidate provider summaries with Claude.
-8. Write the final Urdu summary as plain UTF-8 text:
+1. Load config and optionally apply a CLI-selected prompt set with `-p/--prompt-set`.
+2. Validate input PDF.
+3. Render PDF pages to PNG with PyMuPDF and save them under `page_images/`.
+4. Run Google Cloud Vision document OCR.
+5. Correct OCR text using the configured correction provider. The correction stage passes the OCR text plus rendered page images to Gemini so it can compare OCR against the handwritten source.
+6. Summarise corrected text in parallel with ChatGPT, Gemini, Grok, and DeepSeek.
+7. Require at least `pipeline.min_summaries` successful summaries. The current master config requires all four.
+8. Consolidate provider summaries with Claude.
+9. Write the final Urdu summary as plain UTF-8 text:
    - run artifact: `05_output.txt`
    - simple runner copy: `<input-pdf-stem>.txt` in `output.final_text_directory`
-9. Write intermediate artifacts and `manifest.json`.
+10. Write intermediate artifacts and `manifest.json`, including `prompt_set`.
 
 ## Current Default Providers
 
@@ -55,6 +56,10 @@ This repo is a Python CLI app for PDF OCR, Urdu summarisation, multi-provider co
 - `prompts/summarise.prompt.txt`: first-person, conversational/respectful Urdu correspondence summary style.
 - `prompts/consolidate.prompt.txt`: four-summary consolidation using `summary1` through `summary4`.
 - Packaged default copies live under `src/document_summariser/defaults/prompts/`.
+- Selectable prompt sets live under `prompts/sets/<name>/` and packaged copies under `src/document_summariser/defaults/prompts/sets/<name>/`.
+- A prompt set must contain `summarise.prompt.txt` and `consolidate.prompt.txt`; the OCR correction prompt remains fixed by config.
+- Use `summarise input.pdf -p <name>` or `summarise input.pdf --prompt-set <name>` to apply a prompt set to one PDF or the whole batch.
+- `prompts/sets/default/` is the baseline selectable set copied from the current summarise/consolidate prompts.
 
 ## Credentials And Secrets
 
@@ -90,7 +95,7 @@ summarise --help
 Expected current test result:
 
 ```text
-18 passed
+40 passed
 ```
 
 On this Windows/sandbox setup, pytest may need to run outside the sandbox because pytest-created temp directories can receive ACLs that the sandbox cannot scan. Clean `pytest-tmp/` after test runs if it remains.

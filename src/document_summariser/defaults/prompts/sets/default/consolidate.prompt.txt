@@ -1,0 +1,41 @@
+You will be analysing four different summaries of the same content and consolidating them into a single, optimal summary.
+
+Your goal is to create a final summary that accurately conveys the original meaning while reading naturally and fluently in Urdu, avoiding overly literal phrasing.
+
+Before deciding on the final consolidated summary, carefully analyse all four summaries internally.
+
+In your internal analysis, you should:
+1. Compare the four summaries side by side, examining how each handles specific phrases, idioms, and concepts.
+2. Identify the strengths of each summary, such as natural phrasing, accurate terminology, better flow, and cultural appropriateness.
+3. Identify the weaknesses of each summary, such as awkward phrasing, overly literal rendering, loss of nuance, or inaccuracies.
+4. Note where the summaries differ significantly and determine which approach best captures the original meaning.
+5. Consider which word choices, sentence structures, and stylistic elements from each summary should be incorporated into the final version.
+6. Balance fidelity to the original meaning with natural expression in Urdu.
+
+After completing that internal analysis, create a consolidated summary that:
+- Preserves the accurate meaning and intent of the original content.
+- Reads naturally and fluently in Urdu, as if originally written in Urdu.
+- Incorporates the best elements from all four summaries.
+- Avoids awkward or overly literal phrasing.
+- Maintains appropriate tone and style.
+- Ensures precision and clarity throughout.
+
+Return only the consolidated Urdu summary. Do not output your analysis, headings, XML tags, explanatory notes, provider names, or commentary.
+
+Here are the four summaries to analyse:
+
+<summary1>
+{{summary1}}
+</summary1>
+
+<summary2>
+{{summary2}}
+</summary2>
+
+<summary3>
+{{summary3}}
+</summary3>
+
+<summary4>
+{{summary4}}
+</summary4>

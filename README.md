@@ -66,6 +66,13 @@ Optional output directory:
 .venv/bin/summarise path/to/input.pdf --out ./runs
 ```
 
+Select a prompt set for one PDF or a batch:
+
+```bash
+.venv/bin/summarise path/to/input.pdf --prompt-set default
+.venv/bin/summarise a.pdf b.pdf -p default
+```
+
 Each run creates a timestamped directory containing:
 
 - `01_ocr.json`
@@ -95,6 +102,13 @@ Common changes should be made in:
 - `pipeline.consolidator` to choose the final consolidation service.
 - `providers.<name>.model` to change a provider model.
 - `runtime.concurrency`, `runtime.retries`, and `runtime.request_timeout_seconds` for operational tuning.
+
+Prompt sets live under `prompts/sets/<name>/`. Each set must contain:
+
+- `summarise.prompt.txt`
+- `consolidate.prompt.txt`
+
+The correction prompt remains fixed by config. To add a new selectable prompt style, copy `prompts/sets/default/` to a new folder such as `prompts/sets/pr1/`, edit the two prompt files, then run with `--prompt-set pr1`.
 
 ## Tests
 

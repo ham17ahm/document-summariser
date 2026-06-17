@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -34,6 +34,8 @@ class AppConfig:
     min_summaries: int
     providers: dict[str, ProviderConfig]
     prompts: dict[str, Path]
+    prompt_sets_dir: Path
+    selected_prompt_set: str | None
     output: dict[str, Any]
     runtime: dict[str, Any]
 
@@ -99,6 +101,14 @@ def load_config(path: str | Path | None = None) -> AppConfig:
         name: _resolve_path(source_path.parent, prompt_path)
         for name, prompt_path in raw.get("prompts", {}).items()
     }
+    prompt_sets = raw.get("prompt_sets", {})
+    if prompt_sets is None:
+        prompt_sets = {}
+    if not isinstance(prompt_sets, dict):
+        raise ConfigError(
+            "Config key 'prompt_sets' must be a mapping.",
+            details={"config_file": str(source_path)},
+        )
     output = raw.get("output", {})
 
     try:
@@ -113,6 +123,8 @@ def load_config(path: str | Path | None = None) -> AppConfig:
             min_summaries=int(pipeline.get("min_summaries", 1)),
             providers=providers,
             prompts=prompts,
+            prompt_sets_dir=_resolve_path(source_path.parent, str(prompt_sets.get("directory", "prompts/sets"))),
+            selected_prompt_set=None,
             output=output,
             runtime=raw.get("runtime", {}),
         )
@@ -189,6 +201,55 @@ def validate_config(config: AppConfig) -> None:
                 "request_timeout_seconds": config.runtime.get("request_timeout_seconds"),
             },
         )
+
+
+def apply_prompt_set(config: AppConfig, prompt_set: str | None) -> AppConfig:
+    if prompt_set is None:
+        return config
+
+    prompt_set = prompt_set.strip()
+    if not prompt_set:
+        raise ConfigError(
+            "Prompt set name cannot be empty.",
+            details={"config_file": str(config.source_path)},
+        )
+
+    prompt_set_path = Path(prompt_set)
+    if prompt_set_path.is_absolute() or prompt_set_path.name != prompt_set:
+        raise ConfigError(
+            "Prompt set name must be a single folder name, not a path.",
+            details={"config_file": str(config.source_path), "prompt_set": prompt_set},
+        )
+
+    root = config.prompt_sets_dir.resolve()
+    selected_dir = (root / prompt_set).resolve()
+    if selected_dir.parent != root:
+        raise ConfigError(
+            "Prompt set must be inside the configured prompt_sets directory.",
+            details={"config_file": str(config.source_path), "prompt_set": prompt_set},
+        )
+
+    required = {
+        "summarise": selected_dir / "summarise.prompt.txt",
+        "consolidate": selected_dir / "consolidate.prompt.txt",
+    }
+    missing = [name for name, path in required.items() if not path.exists()]
+    if missing:
+        raise ConfigError(
+            f"Prompt set {prompt_set!r} is missing required prompt file(s): {', '.join(missing)}",
+            details={
+                "config_file": str(config.source_path),
+                "prompt_set": prompt_set,
+                "prompt_set_dir": str(selected_dir),
+                "missing": missing,
+            },
+        )
+
+    prompts = dict(config.prompts)
+    prompts.update(required)
+    updated = replace(config, prompts=prompts, selected_prompt_set=prompt_set)
+    validate_config(updated)
+    return updated
 
 
 def _load_provider_config(provider_id: str, settings: dict[str, Any]) -> ProviderConfig:

@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 
-from document_summariser.config import default_config_path, load_config, preferred_config_path
+from document_summariser.config import apply_prompt_set, default_config_path, load_config, preferred_config_path
 
 
 def test_master_config_loads():
@@ -27,6 +27,8 @@ def test_master_config_loads():
     assert config.providers["grok"].base_url == "https://api.x.ai/v1"
     assert config.providers["deepseek"].model == "deepseek-v4-pro"
     assert config.providers["deepseek"].type == "deepseek"
+    assert config.prompt_sets_dir == Path("prompts/sets").resolve()
+    assert config.selected_prompt_set is None
     assert config.output["format"] == "txt"
 
 
@@ -37,6 +39,7 @@ def test_packaged_default_config_loads():
     assert config.source_path == default_config_path()
     assert config.summarisers == ["chatgpt", "gemini", "grok", "deepseek"]
     assert config.prompts["correction"].exists()
+    assert config.prompt_sets_dir.exists()
     assert config.output["format"] == "txt"
 
 
@@ -69,3 +72,67 @@ prompts:
 
     with pytest.raises(ValueError, match="correction_provider"):
         load_config(config_path)
+
+
+def test_apply_prompt_set_overrides_summarise_and_consolidate_only(tmp_path):
+    config = load_config(_write_prompt_set_config(tmp_path))
+    set_dir = tmp_path / "prompt-sets" / "pr1"
+    set_dir.mkdir(parents=True)
+    custom_summarise = set_dir / "summarise.prompt.txt"
+    custom_consolidate = set_dir / "consolidate.prompt.txt"
+    custom_summarise.write_text("custom summarise {{document}} {{summary_language}}", encoding="utf-8")
+    custom_consolidate.write_text("custom consolidate {{summary1}}", encoding="utf-8")
+
+    updated = apply_prompt_set(config, "pr1")
+
+    assert updated.selected_prompt_set == "pr1"
+    assert updated.prompts["correction"] == config.prompts["correction"]
+    assert updated.prompts["summarise"] == custom_summarise.resolve()
+    assert updated.prompts["consolidate"] == custom_consolidate.resolve()
+
+
+def test_apply_prompt_set_rejects_missing_required_files(tmp_path):
+    config = load_config(_write_prompt_set_config(tmp_path))
+    set_dir = tmp_path / "prompt-sets" / "pr1"
+    set_dir.mkdir(parents=True)
+    (set_dir / "summarise.prompt.txt").write_text("custom {{document}}", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="consolidate"):
+        apply_prompt_set(config, "pr1")
+
+
+def test_apply_prompt_set_rejects_path_names(tmp_path):
+    config = load_config(_write_prompt_set_config(tmp_path))
+
+    with pytest.raises(ValueError, match="single folder name"):
+        apply_prompt_set(config, "../pr1")
+
+
+def _write_prompt_set_config(tmp_path: Path) -> Path:
+    config_path = tmp_path / "config.yaml"
+    correction = Path("prompts/correction.prompt.txt").resolve()
+    summarise = Path("prompts/summarise.prompt.txt").resolve()
+    consolidate = Path("prompts/consolidate.prompt.txt").resolve()
+    config_path.write_text(
+        f"""
+pipeline:
+  correction_provider: claude
+  summarisers: [claude]
+  consolidator: claude
+providers:
+  claude:
+    type: mock
+    model: claude-test
+prompts:
+  correction: {correction}
+  summarise: {summarise}
+  consolidate: {consolidate}
+prompt_sets:
+  directory: {tmp_path / "prompt-sets"}
+runtime:
+  concurrency: 1
+  retries: 1
+""",
+        encoding="utf-8",
+    )
+    return config_path

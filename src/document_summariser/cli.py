@@ -23,6 +23,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--out", default=None, help="Output runs directory.")
     parser.add_argument(
+        "-p",
+        "--prompt-set",
+        default=None,
+        help="Prompt set folder under prompt_sets.directory to use for summarise and consolidate prompts.",
+    )
+    parser.add_argument(
         "--final-text",
         default=None,
         help="Optional path for a copy of the final TXT output. Single PDF only.",
@@ -61,7 +67,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if len(args.pdf) == 1:
         try:
-            result = run_document_summary(args.pdf[0], config_path=args.config, output_dir=args.out)
+            result = run_document_summary(
+                args.pdf[0],
+                config_path=args.config,
+                output_dir=args.out,
+                prompt_set=args.prompt_set,
+            )
             if args.final_text:
                 final_text = copy_final_text(result.output_text_path, Path(args.final_text))
                 print(f"Wrote final TXT to {final_text}")
@@ -76,7 +87,15 @@ def main(argv: list[str] | None = None) -> int:
         print("Error: --final-text cannot be used with multiple input PDFs.", file=sys.stderr)
         return 1
 
-    return _run_concurrent(args.pdf, args.config, args.out, debug, args.parallel, args.publish_final)
+    return _run_concurrent(
+        args.pdf,
+        args.config,
+        args.out,
+        debug,
+        args.parallel,
+        args.publish_final,
+        args.prompt_set,
+    )
 
 
 def _run_concurrent(
@@ -86,6 +105,7 @@ def _run_concurrent(
     debug: bool,
     parallel: int,
     publish_final: bool = False,
+    prompt_set: str | None = None,
 ) -> int:
     any_failed = False
     # Each pipeline already fans out its own summariser threads; running every
@@ -93,7 +113,7 @@ def _run_concurrent(
     max_workers = max(1, min(parallel, len(pdf_paths)))
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(run_document_summary, path, config, out): path
+            executor.submit(run_document_summary, path, config, out, prompt_set): path
             for path in pdf_paths
         }
         for future in as_completed(futures):

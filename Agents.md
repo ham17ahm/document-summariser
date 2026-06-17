@@ -21,16 +21,17 @@ Priorities:
 
 The app flow is:
 
-1. Validate input PDF.
-2. Render PDF pages to PNG using PyMuPDF.
-3. Save page images under `page_images/`.
-4. Run Google Cloud Vision OCR.
-5. Correct OCR text using Gemini with rendered page images attached.
-6. Summarise corrected text in parallel with ChatGPT, Gemini, Grok, and DeepSeek.
-7. Require at least `pipeline.min_summaries` successful summaries.
-8. Consolidate summaries with Claude.
-9. Write final Urdu output as plain UTF-8 text.
-10. Write intermediate artifacts and `manifest.json`.
+1. Load config and optionally apply a CLI-selected prompt set with `-p/--prompt-set`.
+2. Validate input PDF.
+3. Render PDF pages to PNG using PyMuPDF.
+4. Save page images under `page_images/`.
+5. Run Google Cloud Vision OCR.
+6. Correct OCR text using Gemini with rendered page images attached.
+7. Summarise corrected text in parallel with ChatGPT, Gemini, Grok, and DeepSeek.
+8. Require at least `pipeline.min_summaries` successful summaries.
+9. Consolidate summaries with Claude.
+10. Write final Urdu output as plain UTF-8 text.
+11. Write intermediate artifacts and `manifest.json`, including `prompt_set`.
 
 Canonical editable config:
 
@@ -96,7 +97,9 @@ Prompt files live in:
 
 ```text
 prompts/
+prompts/sets/<name>/
 src/document_summariser/defaults/prompts/
+src/document_summariser/defaults/prompts/sets/<name>/
 ```
 
 ---
@@ -209,6 +212,10 @@ Prompt rules:
 - Keep prompt text in prompt files.
 - Preserve strict placeholder rendering.
 - Keep editable prompts and packaged default prompts in sync when needed.
+- Selectable prompt sets live under `prompts/sets/<name>/` and must contain `summarise.prompt.txt` and `consolidate.prompt.txt`.
+- Users select a prompt set with `summarise input.pdf -p <name>` or `summarise input.pdf --prompt-set <name>`; the same set applies to the whole batch.
+- Prompt sets override only summarise and consolidate prompts. Keep the OCR correction prompt fixed by config unless explicitly asked to change that contract.
+- Reject prompt-set names that are paths or leave the configured `prompt_sets.directory`.
 - If changing the number of summariser providers, check `consolidate.prompt.txt` and `pipeline.min_summaries`.
 
 ---
@@ -271,7 +278,7 @@ summarise --help
 Expected current test result:
 
 ```text
-18 passed
+40 passed
 ```
 
 On Windows/sandbox setups, pytest may need to run outside the sandbox because temp directories can receive ACLs the sandbox cannot scan.

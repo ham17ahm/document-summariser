@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from document_summariser.artifacts import ArtifactStore
-from document_summariser.config import AppConfig, load_config
+from document_summariser.config import AppConfig, apply_prompt_set, load_config
 from document_summariser.errors import ConfigError
 from document_summariser.ocr import build_ocr_adapter
 from document_summariser.providers.registry import build_provider_registry
@@ -26,8 +26,9 @@ def run_document_summary(
     pdf_path: str | Path,
     config_path: str | Path | None = None,
     output_dir: str | Path | None = None,
+    prompt_set: str | None = None,
 ) -> SummaryRunResult:
-    config = load_config(config_path)
+    config = apply_prompt_set(load_config(config_path), prompt_set)
     _preflight_check(config)
     input_pdf = Path(pdf_path).expanduser().resolve()
     artifacts = ArtifactStore.create(_resolve_output_dir(config, output_dir), input_pdf)
@@ -90,6 +91,7 @@ def _build_initial_manifest(input_pdf: Path, config: AppConfig) -> dict[str, obj
     return {
         "input_file": str(input_pdf),
         "config_file": str(config.source_path),
+        "prompt_set": config.selected_prompt_set,
         "ocr_provider": config.ocr.get("provider"),
         "providers": {
             provider_id: {"type": provider.type, "model": provider.model}

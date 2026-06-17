@@ -1,0 +1,124 @@
+<urdu_summarization_prompt>
+
+  <task_overview>
+    <primary_objective>
+Create a concise Urdu summary that narrates the main concerns and requests of the correspondence in a natural flow, using clear background where necessary, and concluding with the crux of the matter.
+    </primary_objective>
+    <language>{{summary_language}}</language>
+    <perspective>First-person narrative, maintaining the author’s voice</perspective>
+    <tone>Conversational and respectful, as if explaining to an elder</tone>
+  </task_overview>
+
+  <analysis_guidelines>
+    <requirement priority="1">Thoroughly analyze the entire document before summarizing.</requirement>
+    <requirement priority="2">Identify the main points and nuanced details.</requirement>
+    <requirement priority="3">Clarify ambiguous or unclear sentences/phrases where the intended meaning is reasonably clear.</requirement>
+    <requirement priority="4">Extract the crux/essence of the matter.</requirement>
+    <requirement priority="5">Distinguish between critical information and unnecessary details.</requirement>
+  </analysis_guidelines>
+
+  <content_priorities>
+    <include>
+      <item>Main concern with brief necessary background.</item>
+      <item>The issue or difficulty faced.</item>
+      <item>The final request, decision, prayer, or guidance sought.</item>
+    </include>
+    <exclude>
+      <item>Unnecessary lengthy introductions or formal prayers.</item>
+      <item>Irrelevant side points or details.</item>
+      <item>Repetition of the same point or concept.</item>
+    </exclude>
+  </content_priorities>
+
+  <urdu_style_requirements>
+    <vocabulary>Simple, natural Urdu without being too formal.</vocabulary>
+    <sentence_structure>Short to medium sentences in a narrative flow.</sentence_structure>
+    <writing_characteristics>
+      <characteristic>Direct yet respectful narration.</characteristic>
+      <characteristic>Clear mention of issue and reasoning.</characteristic>
+      <characteristic>Ends with a focused request or question.</characteristic>
+    </writing_characteristics>
+  </urdu_style_requirements>
+
+  <style_patterns_from_examples>
+    <pattern>Use present tense for ongoing situations: "مشکلات کا سامنا کر رہی ہوں"</pattern>
+    <pattern>Express regularity with phrases like: "باقاعدگی سے", "بھرپور کوشش کرتا ہوں"</pattern>
+    <pattern>Connect ideas naturally: "گو کہ... لیکن"</pattern>
+    <pattern>Maintain respectful tone when mentioning superiors: "حضورانور", "قائد صاحب"</pattern>
+    <pattern>Use appropriate time markers: "گزشتہ ایک ہفتہ سے", "جب سے"</pattern>
+    <pattern>Present problems clearly: "کچھ مسائل کا سامنا ہے", "مشکل پیش آرہی ہے"</pattern>
+  </style_patterns_from_examples>
+
+  <summary_structure>
+    <opening>Explain the main update or concern.</opening>
+    <body>Explain briefly the relevant background and why it matters.</body>
+    <closing>Conclude with the request for guidance, prayer, or decision.</closing>
+  </summary_structure>
+
+  <quality_assurance>
+    <check>Ensure every critical information is captured.</check>
+    <check>Verify first-person perspective is maintained throughout.</check>
+    <check>Confirm conversational yet respectful tone.</check>
+    <check>Validate that sentence structure matches the examples.</check>
+    <check>Ensure conciseness without losing essential meaning.</check>
+    <check>Verify natural Urdu flow and readability.</check>
+  </quality_assurance>
+
+  <execution_steps>
+    <step number="1">Read and analyze the complete correspondence.</step>
+    <step number="2">Identify all key points, suggestions, and critical information.</step>
+    <step number="3">Determine the logical flow and priority of information.</step>
+    <step number="4">Draft the summary in Urdu, maintaining first-person narrative.</step>
+    <step number="5">Apply the linguistic patterns from the examples.</step>
+    <step number="6">Review for conciseness while ensuring completeness.</step>
+    <step number="7">Perform a final quality check against all requirements.</step>
+  </execution_steps>
+
+<example_summaries>
+  <instructions>
+    Each example below contains a pair of summaries for the same content. The
+    <good_summary> is acceptable, but the <better_summary> demonstrates the
+    preferred standard. Study the differences between each pair carefully and
+    model your output on the <better_summary> versions, paying attention to:
+    - Choice of words (more natural, idiomatic Urdu phrasing)
+    - Paraphrasing rather than repeating the original wording
+    - Brevity and tighter sentence construction without losing the essence
+      or any key detail
+  </instructions>
+
+  <example id="1">
+    <good_summary>میرے تین بچے ہیں۔ حضورانور کو بہت مِس کرتی ہوں اور ملنا بھی چاہتی ہوں۔ گو کہ میرے بچے جماعت سے جڑے ہوئے ہیں اور مقامی قائد صاحب سے بھی ان کا اچھا رابطہ ہے لیکن گزشتہ ایک ہفتہ سے ان کی تربیت میں کچھ مشکل پیش آرہی ہے۔ ایک بیٹے کو سکول میں کچھ مسائل کا سامنا ہے کیونکہ اس کا سکول اسلام کے خلاف سخت نظریہ رکھتا ہے۔</good_summary>
+    <better_summary>حضورانور سے ملنا چاہتی ہوں۔ میرے تین بچے گو کہ جماعت سے جڑے ہوئے ہیں اور مقامی قائد صاحب سے بھی ان کا اچھا رابطہ ہے لیکن ان کی تربیت میں کچھ مشکل پیش آرہی ہے۔ ایک بیٹے کا سکول اسلام کے خلاف سخت نظریہ رکھتا ہے جس کی وجہ سے اسے کچھ مسائل کا سامنا ہے۔</better_summary>
+  </example>
+
+  <example id="2">
+    <good_summary>میں نے Philadelphia میں ایک نوجوان لڑکی کو مسلمان بنانے کے بعد اس سے شادی کی۔ پھر ہم نے 2022ء میں حضورانور کے امریکہ دورہ کے دوران حضور سے ملاقات بھی کی۔ اس وقت میں اپنی بیوی اور دو بچوں کے ساتھ رہتا ہوں اور ایک جگہ ملازمت کرتا ہوں۔ پانچ وقت کی نمازوں میں باقاعدہ ہوں۔ ہر روز کئی بار باجماعت نماز پڑھنے کی بھرپور کوشش کرتا ہوں۔ تہجد کی نماز بھی بہت باقاعدگی سے ادا کرنے کی کوشش کرتا ہوں۔ اسی طرح وصیت بھی کی ہوئی ہے اور وصیت کے مطابق چندہ ادا کرنے میں باقاعدہ ہوں۔</good_summary>
+    <better_summary>میں نے Philadelphia میں ایک لڑکی کو مسلمان کرنے کے بعد اس سے شادی کرلی۔ 2022ء میں امریکہ دورہ کے دوران حضورانور سے ملاقات بھی کی۔ آجکل میں اپنے اہل خانہ کے ساتھ رہتا ہوں اور ملازمت کرتا ہوں۔ پنجوقتہ نمازوں میں باقاعدہ ہوں۔ روزانہ باجماعت نماز پڑھنے اور تہجد کی نماز بھی باقاعدگی سے ادا کرنے کی کوشش کرتا ہوں۔ وصیت کے بعد اس کے مطابق چندہ ادا کرنے میں بھی باقاعدہ ہوں۔</better_summary>
+  </example>
+
+  <example id="3">
+    <good_summary>بعض بچیوں کا کہنا ہے کہ کچھ احمدی لڑکیاں کالج یا یونیورسٹی میں فیشن والا لباس پہن کر آتی ہیں۔ ایسی لڑکیاں Smart لگ رہی ہوتی ہیں جبکہ ہم برقعہ پہن کر افسردہ لگتی ہیں۔ لیکن افسوس کہ ان بچیوں کو معلوم نہیں کہ اول وہ برقعہ میں بری نہیں لگتیں اور دوسرے خدا تعالیٰ کا حکم بہرحال بالا ہے۔ کیونکہ جب وہ حیا والا لباس پہن کر باہر جاتی ہیں تو ان کا یہ عمل اللہ تعالیٰ کو اچھا لگ رہا ہوتا ہے۔ اس لئے ان کو یہ بات اچھی طرح سمجھانے کی ضرورت ہے کہ پردہ ان کی ترقی کی راہ میں حائل ہونے کی بجائے ان کو دینی اور دنیاوی دونوں طرح کی ترقیات کا حامل بناتا ہے۔ وہ پردہ کرکے جو چاہیں کرسکتی ہیں۔ اعلیٰ سے اعلیٰ تعلیم حاصل کر سکتی ہیں۔ اچھی ملازمت کر سکتی ہیں۔ ہماری جماعت میں ایسی کئی مثالیں موجود ہیں کہ خواتین نے مکمل اور صحیح پردہ کے ساتھ اعلیٰ تعلیم حاصل کی اور عمدہ ملازمتیں بھی کیں۔</good_summary>
+    <better_summary>بعض بچیاں کہتی ہیں کہ کچھ احمدی لڑکیاں جو کالج یا یونیورسٹی میں فیشن والا لباس پہن کر آتی ہیں وہ Smart لگ رہی ہوتی ہیں جبکہ ہم برقعہ پہن کر افسردہ لگتی ہیں۔ لیکن افسوس کہ ان بچیوں کو معلوم نہیں کہ ایک تو وہ برقعہ میں بری نہیں لگتیں اور دوسرے خدا تعالیٰ کا حکم بہرحال بالا ہے۔ کیونکہ جب وہ حیاءدار لباس پہن کر باہر جاتی ہیں تو ان کا یہ عمل اللہ تعالیٰ کو اچھا لگ رہا ہوتا ہے۔ اس لئے انہیں یہ بات سمجھانے کی ضرورت ہے کہ پردہ ان کی ترقی کی راہ میں حائل ہونے کی بجائے ان کو دینی اور دنیاوی ترقیات کا حامل بناتا ہے۔ وہ پردہ میں جو چاہیں کرسکتی ہیں۔ اعلیٰ سے اعلیٰ تعلیم حاصل کر سکتی ہیں۔ اچھی ملازمت بھی کر سکتی ہیں اور ہماری جماعت میں ایسی خواتین کی کئی مثالیں موجود ہیں جنہوں نے صحیح پردہ کے ساتھ تعلیم حاصل کرکے عمدہ ملازمتیں کیں۔</better_summary>
+  </example>
+
+  <example id="4">
+    <good_summary>جب سے شادی ہوئی اس وقت سے گھر میں بہت ساری مشکلات کا سامنا کر رہی ہوں۔ شوہر کام کرکے واپس آتے ہیں تو ان کا رویہ نہایت سخت ہوتا ہے۔ نہ بچوں کو وقت دیتے ہیں اور نہ ہمارا کچھ خیال کرتے ہیں۔ انہیں بس اپنی پڑی ہوتی ہے کہ ان کی ضروریات کا خیال رکھا جائے۔ اگرچہ میں پوری کوشش کرتی ہوں کہ گھر کو سنبھالوں اور اپنی گھریلو ذمہ داریاں احسن رنگ میں ادا کروں لیکن شوہر کے عدم تعاون کی وجہ سے آسانیوں کی بجائے مشکلات بڑھ رہی ہیں۔ کچھ سمجھ نہیں آرہی کہ کیا کروں۔</good_summary>
+    <better_summary>شادی کے بعد سے گھر میں بہت ساری مشکلات کا سامنا ہے۔ شوہر کام کرکے گھر آتے ہیں تو ان کا رویہ نہایت سخت ہوتا ہے۔ نہ بچوں کو وقت دیتے ہیں اور نہ ہمارا کچھ خیال کرتے ہیں۔ انہیں بس اپنی پڑی ہوتی ہے کہ ان کی ضروریات کا خیال رکھا جائے۔ اگرچہ میں پوری کوشش کرتی ہوں کہ گھر سنبھالوں اور گھریلو ذمہ داریاں ادا کروں لیکن شوہر کے عدم تعاون کی وجہ سے آسانیوں کی بجائے مشکلات بڑھ رہی ہیں۔ کچھ سمجھ نہیں آرہی کہ کیا کروں۔</better_summary>
+  </example>
+</example_summaries>
+
+  <output_format>
+    <format>Plain Urdu text only in ONE concise paragraph.</format>
+    <length>6-9 sentences depending on complexity.</length>
+    <style>Natural, conversational flow with clear focus on the crux.</style>
+  </output_format>
+
+  <final_instruction>
+Return only the final Urdu summary. Do not include headings, XML tags, bullet points, analysis notes, or explanations.
+  </final_instruction>
+
+</urdu_summarization_prompt>
+
+[THE CORRESPONDENCE STARTS FROM BELOW]
+
+{{document}}

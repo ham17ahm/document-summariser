@@ -31,7 +31,43 @@ def test_run_aborts_when_pipeline_provider_lacks_api_key_env(tmp_path):
     assert not runs_dir.exists()
 
 
-def _write_config(tmp_path: Path, provider_block: str) -> Path:
+def test_run_uses_selected_prompt_set(tmp_path):
+    pdf = tmp_path / "sample.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n% placeholder\n")
+    config = _write_config(tmp_path, provider_block="", provider_type="mock")
+    prompt_set_dir = tmp_path / "prompt-sets" / "pr1"
+    prompt_set_dir.mkdir(parents=True)
+    (prompt_set_dir / "summarise.prompt.txt").write_text(
+        "CUSTOM SUMMARY PROMPT {{document}} {{summary_language}}",
+        encoding="utf-8",
+    )
+    (prompt_set_dir / "consolidate.prompt.txt").write_text(
+        "CUSTOM CONSOLIDATE PROMPT {{summary1}}",
+        encoding="utf-8",
+    )
+
+    result = run_document_summary(pdf, config_path=config, output_dir=tmp_path / "runs", prompt_set="pr1")
+    output = result.output_text_path.read_text(encoding="utf-8")
+
+    assert result.config.selected_prompt_set == "pr1"
+    assert result.context.manifest["prompt_set"] == "pr1"
+    assert "CUSTOM CONSOLIDATE PROMPT" in output
+    assert "CUSTOM SUMMARY PROMPT" in output
+
+
+def test_run_aborts_before_artifacts_when_prompt_set_missing(tmp_path):
+    pdf = tmp_path / "sample.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n% placeholder\n")
+    config = _write_config(tmp_path, provider_block="", provider_type="mock")
+    runs_dir = tmp_path / "runs"
+
+    with pytest.raises(ConfigError, match="missing"):
+        run_document_summary(pdf, config_path=config, output_dir=runs_dir, prompt_set="missing")
+
+    assert not runs_dir.exists()
+
+
+def _write_config(tmp_path: Path, provider_block: str, provider_type: str = "openai") -> Path:
     config_path = tmp_path / "config.yaml"
     correction = Path("prompts/correction.prompt.txt").resolve()
     summarise = Path("prompts/summarise.prompt.txt").resolve()
@@ -52,7 +88,7 @@ pipeline:
 
 providers:
   gpt:
-    type: openai
+    type: {provider_type}
     model: gpt-test
 {provider_block}
 
@@ -60,6 +96,9 @@ prompts:
   correction: {correction}
   summarise: {summarise}
   consolidate: {consolidate}
+
+prompt_sets:
+  directory: {tmp_path / "prompt-sets"}
 
 runtime:
   concurrency: 1
