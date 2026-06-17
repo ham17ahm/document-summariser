@@ -1,0 +1,134 @@
+Prompt Set User Guide
+=====================
+
+This guide explains how to use different summarise and consolidate prompts
+when running the document summariser.
+
+
+What Is A Prompt Set?
+---------------------
+
+A prompt set is a folder that contains two prompt files:
+
+1. summarise.prompt.txt
+2. consolidate.prompt.txt
+
+The folder name is the name you use in the command.
+
+For example, if the folder is called:
+
+prompts/sets/pr1/
+
+then you use:
+
+summarise input.pdf -p pr1
+
+
+Default Use
+-----------
+
+If you do not choose a prompt set, the app uses the normal current prompts:
+
+summarise input.pdf
+
+You can also explicitly choose the built-in default prompt set:
+
+summarise input.pdf -p default
+
+At the moment, both commands use the same summarise and consolidate prompt
+content.
+
+
+How To Create A New Prompt Set
+------------------------------
+
+Step 1:
+Open the prompts folder.
+
+Step 2:
+Open the sets folder inside it:
+
+prompts/sets/
+
+Step 3:
+Create a new folder with the name you want to use.
+
+Example:
+
+prompts/sets/pr1/
+
+Step 4:
+Inside that new folder, add these two files with exactly these names:
+
+summarise.prompt.txt
+consolidate.prompt.txt
+
+The names must match exactly.
+
+Step 5:
+Put your new summarise prompt inside:
+
+prompts/sets/pr1/summarise.prompt.txt
+
+Step 6:
+Put your new consolidate prompt inside:
+
+prompts/sets/pr1/consolidate.prompt.txt
+
+Step 7:
+Run the app using the folder name:
+
+summarise input.pdf -p pr1
+
+
+Batch Use
+---------
+
+You can use the same prompt set for multiple PDFs at once:
+
+summarise file1.pdf file2.pdf file3.pdf -p pr1
+
+This uses the pr1 prompt set for every PDF in that command.
+
+
+Important Notes
+---------------
+
+Only these two prompts change when you use a prompt set:
+
+1. summarise.prompt.txt
+2. consolidate.prompt.txt
+
+The OCR correction prompt does not change. It still comes from:
+
+prompts/correction.prompt.txt
+
+Do not rename the two files inside a prompt set.
+
+Do not use slashes or full paths in the command. Use only the folder name.
+
+Correct:
+
+summarise input.pdf -p pr1
+
+Incorrect:
+
+summarise input.pdf -p prompts/sets/pr1
+
+
+Quick Example
+-------------
+
+If you create this folder:
+
+prompts/sets/short-summary/
+
+and inside it you add:
+
+summarise.prompt.txt
+consolidate.prompt.txt
+
+then run:
+
+summarise input.pdf -p short-summary
+
