@@ -35,11 +35,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--publish-final",
+        dest="publish_final",
         action="store_true",
+        default=True,
         help=(
             "Copy each final TXT to output.final_text_directory from the config "
-            "(defaults to beside the input PDF) and print its path."
+            "(defaults to beside the input PDF) and print its path. This is the default."
         ),
+    )
+    parser.add_argument(
+        "--no-publish-final",
+        dest="publish_final",
+        action="store_false",
+        help="Only write run artifacts; do not copy the final TXT to the final output folder.",
     )
     parser.add_argument(
         "--parallel",
@@ -77,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
                 final_text = copy_final_text(result.output_text_path, Path(args.final_text))
                 print(f"Wrote final TXT to {final_text}")
             if args.publish_final:
-                print(publish_final_text(result))
+                print(f"Wrote final TXT to {publish_final_text(result)}")
             print(f"Wrote run artifacts to {result.artifacts.root}")
             return 0
         except Exception as exc:  # noqa: BLE001 - CLI boundary must render all runtime failures
@@ -122,7 +130,7 @@ def _run_concurrent(
             try:
                 result = future.result()
                 if publish_final:
-                    print(f"[{label}] {publish_final_text(result)}")
+                    print(f"[{label}] Wrote final TXT to {publish_final_text(result)}")
                 print(f"[{label}] Wrote run artifacts to {result.artifacts.root}")
             except Exception as exc:  # noqa: BLE001 - report per-PDF failures without stopping others
                 any_failed = True

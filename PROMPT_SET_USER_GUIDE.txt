@@ -1,134 +1,259 @@
-Prompt Set User Guide
-=====================
+Document Summariser User Guide
+==============================
 
-This guide explains how to use different summarise and consolidate prompts
-when running the document summariser.
+This guide explains how to run the document summariser from PowerShell.
 
+The app reads one or more PDF files, performs OCR, corrects the OCR text,
+creates summaries using the configured model providers, consolidates the
+results, and writes the final Urdu summary as a plain TXT file.
 
-What Is A Prompt Set?
----------------------
+By default, the final TXT file is copied to:
 
-A prompt set is a folder that contains two prompt files:
+C:\Users\Hamad.Mobeen\Downloads
 
-1. summarise.prompt.txt
-2. consolidate.prompt.txt
+That folder is configured in:
 
-The folder name is the name you use in the command.
+config\master_config.yaml
 
-For example, if the folder is called:
+under:
 
-prompts/sets/pr1/
+output.final_text_directory
 
-then you use:
-
-summarise input.pdf -p pr1
-
-
-Default Use
------------
-
-If you do not choose a prompt set, the app uses the normal current prompts:
-
-summarise input.pdf
-
-You can also explicitly choose the built-in default prompt set:
-
-summarise input.pdf -p default
-
-At the moment, both commands use the same summarise and consolidate prompt
-content.
+The app also writes detailed run artifacts under the configured runs folder.
+Those artifacts are useful for debugging, but the file most users need is the
+final TXT file in Downloads.
 
 
-How To Create A New Prompt Set
-------------------------------
+Before You Start
+----------------
 
-Step 1:
-Open the prompts folder.
+Open PowerShell and go to the project folder:
 
-Step 2:
-Open the sets folder inside it:
+cd "C:\Users\Hamad.Mobeen\Downloads\programming\document-summariser"
 
-prompts/sets/
+Check that the CLI is available:
 
-Step 3:
-Create a new folder with the name you want to use.
+summarise --help
+
+If a PDF path contains spaces, wrap it in quotes:
+
+summarise ".\My Document.pdf"
+
+
+1. Use One PDF With The Default Prompt
+--------------------------------------
+
+Use this when you have one PDF and you want the normal summarisation style.
+
+Command:
+
+summarise .\input.pdf
+
+Replace .\input.pdf with the path to your PDF.
 
 Example:
 
-prompts/sets/pr1/
+summarise "C:\Users\Hamad.Mobeen\Downloads\letter.pdf"
 
-Step 4:
-Inside that new folder, add these two files with exactly these names:
+What happens:
+
+- The app processes one PDF.
+- No prompt set is selected.
+- The normal configured prompts are used.
+- The final TXT is copied to Downloads.
+
+Example final output:
+
+C:\Users\Hamad.Mobeen\Downloads\letter.txt
+
+
+2. Use Multiple PDFs With The Default Prompt
+--------------------------------------------
+
+Use this when you have several PDFs and want all of them processed with the
+normal summarisation style.
+
+Command:
+
+summarise .\file1.pdf .\file2.pdf .\file3.pdf
+
+Example:
+
+summarise "C:\Users\Hamad.Mobeen\Downloads\letter1.pdf" "C:\Users\Hamad.Mobeen\Downloads\letter2.pdf"
+
+What happens:
+
+- The app processes each PDF.
+- No prompt set is selected.
+- The same normal configured prompts are used for every PDF.
+- A separate TXT file is copied to Downloads for each PDF.
+
+Example final outputs:
+
+C:\Users\Hamad.Mobeen\Downloads\letter1.txt
+C:\Users\Hamad.Mobeen\Downloads\letter2.txt
+
+
+3. Use One PDF With The Extended Prompt
+---------------------------------------
+
+Use this when you have one PDF and want the extended prompt style.
+
+Command:
+
+summarise .\input.pdf -p extended
+
+The long version is:
+
+summarise .\input.pdf --prompt-set extended
+
+Example:
+
+summarise "C:\Users\Hamad.Mobeen\Downloads\letter.pdf" -p extended
+
+What happens:
+
+- The app processes one PDF.
+- It uses the prompt set named extended.
+- The extended prompt set changes the summarise and consolidate prompts.
+- The OCR correction prompt remains unchanged.
+- The final TXT is copied to Downloads.
+
+
+4. Use Multiple PDFs With The Extended Prompt
+---------------------------------------------
+
+Use this when you have several PDFs and want all of them processed with the
+extended prompt style.
+
+Command:
+
+summarise .\file1.pdf .\file2.pdf .\file3.pdf -p extended
+
+Example:
+
+summarise "C:\Users\Hamad.Mobeen\Downloads\letter1.pdf" "C:\Users\Hamad.Mobeen\Downloads\letter2.pdf" -p extended
+
+What happens:
+
+- The app processes each PDF.
+- The same prompt set is used for every PDF in the command.
+- A separate TXT file is copied to Downloads for each PDF.
+
+
+5. Add A New Prompt
+-------------------
+
+Prompt sets live inside:
+
+prompts\sets\
+
+Each prompt set is one folder. The folder name is the prompt set name used
+after -p or --prompt-set.
+
+Example new prompt set name:
+
+pr1
+
+Create this folder:
+
+prompts\sets\pr1\
+
+Inside that folder, create exactly these two files:
 
 summarise.prompt.txt
 consolidate.prompt.txt
 
-The names must match exactly.
+The easiest way to start is to copy an existing prompt set folder, then edit
+the two copied prompt files.
 
-Step 5:
-Put your new summarise prompt inside:
+For example, copy:
 
-prompts/sets/pr1/summarise.prompt.txt
+prompts\sets\extended\
 
-Step 6:
-Put your new consolidate prompt inside:
+to:
 
-prompts/sets/pr1/consolidate.prompt.txt
+prompts\sets\pr1\
 
-Step 7:
-Run the app using the folder name:
+Then edit:
 
-summarise input.pdf -p pr1
+prompts\sets\pr1\summarise.prompt.txt
+prompts\sets\pr1\consolidate.prompt.txt
 
+Run with the new prompt set:
 
-Batch Use
----------
+summarise .\input.pdf -p pr1
 
-You can use the same prompt set for multiple PDFs at once:
+Important rules:
 
-summarise file1.pdf file2.pdf file3.pdf -p pr1
-
-This uses the pr1 prompt set for every PDF in that command.
-
-
-Important Notes
----------------
-
-Only these two prompts change when you use a prompt set:
-
-1. summarise.prompt.txt
-2. consolidate.prompt.txt
-
-The OCR correction prompt does not change. It still comes from:
-
-prompts/correction.prompt.txt
-
-Do not rename the two files inside a prompt set.
-
-Do not use slashes or full paths in the command. Use only the folder name.
+- Use only the folder name after -p.
+- Do not pass a folder path after -p.
+- The prompt set must stay inside prompts\sets\.
+- A prompt set must contain both required files.
+- Prompt sets change only summarise.prompt.txt and consolidate.prompt.txt.
+- The OCR correction prompt stays fixed by config unless the app is changed.
 
 Correct:
 
-summarise input.pdf -p pr1
+summarise .\input.pdf -p pr1
 
 Incorrect:
 
-summarise input.pdf -p prompts/sets/pr1
+summarise .\input.pdf -p prompts\sets\pr1
 
 
-Quick Example
--------------
+6. What Happens When No Prompt Is Selected
+------------------------------------------
 
-If you create this folder:
+If you do not use -p or --prompt-set, the app uses the normal prompts from:
 
-prompts/sets/short-summary/
+prompts\summarise.prompt.txt
+prompts\consolidate.prompt.txt
 
-and inside it you add:
+Example:
 
-summarise.prompt.txt
-consolidate.prompt.txt
+summarise .\input.pdf
 
-then run:
+This is the default behavior.
 
-summarise input.pdf -p short-summary
+It is different from explicitly selecting a prompt set:
 
+summarise .\input.pdf -p extended
+
+When no prompt is selected:
+
+- No prompt-set folder is loaded.
+- The run manifest records prompt_set as empty/null.
+- The configured top-level summarise and consolidate prompts are used.
+- The OCR correction prompt is still read from config.
+
+Use no prompt set for the normal summarisation style. Use -p extended only
+when you specifically want the extended prompt style.
+
+
+Useful Options
+--------------
+
+Choose a prompt set:
+
+summarise .\input.pdf -p extended
+
+Use the long prompt-set option:
+
+summarise .\input.pdf --prompt-set extended
+
+Process more PDFs at the same time:
+
+summarise .\file1.pdf .\file2.pdf .\file3.pdf --parallel 3
+
+Write artifacts to a specific runs folder:
+
+summarise .\input.pdf --out .\runs
+
+Do not copy the final TXT to Downloads:
+
+summarise .\input.pdf --no-publish-final
+
+Write one extra final TXT copy to a specific path:
+
+summarise .\input.pdf --final-text "C:\Users\Hamad.Mobeen\Downloads\custom-name.txt"

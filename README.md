@@ -60,6 +60,10 @@ The script prints the final TXT path when it finishes. The default final output 
 .venv/bin/summarise path/to/input.pdf
 ```
 
+The installed `summarise` CLI also copies the final TXT to the configured final
+output folder by default. Use `--no-publish-final` only when you want run
+artifacts without that extra final TXT copy.
+
 Optional output directory:
 
 ```bash

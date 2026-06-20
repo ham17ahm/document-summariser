@@ -1,8 +1,8 @@
 """Simple runner: summarise one or more PDFs and publish the final TXT(s).
 
-Thin wrapper over the main CLI; equivalent to `summarise <pdf>... --publish-final`.
-Each final TXT goes to output.final_text_directory from the config, defaulting
-to the directory of the input PDF.
+Thin wrapper over the main CLI. Each final TXT goes to
+output.final_text_directory from the config, defaulting to the directory of
+the input PDF.
 """
 
 from __future__ import annotations

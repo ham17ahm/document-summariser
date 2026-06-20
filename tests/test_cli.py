@@ -8,8 +8,14 @@ def test_parser_caps_multi_pdf_parallelism_by_default():
     args = build_parser().parse_args(["a.pdf", "b.pdf"])
 
     assert args.parallel == 2
-    assert args.publish_final is False
+    assert args.publish_final is True
     assert args.prompt_set is None
+
+
+def test_parser_can_disable_default_publish():
+    args = build_parser().parse_args(["a.pdf", "--no-publish-final"])
+
+    assert args.publish_final is False
 
 
 def test_parser_accepts_prompt_set_aliases():
@@ -45,7 +51,7 @@ def test_publish_final_supported_for_multiple_pdfs(tmp_path, monkeypatch, capsys
 
     monkeypatch.setattr("document_summariser.cli.run_document_summary", fake_run)
 
-    exit_code = main(["a.pdf", "b.pdf", "--publish-final", "--prompt-set", "pr1"])
+    exit_code = main(["a.pdf", "b.pdf", "--prompt-set", "pr1"])
 
     assert exit_code == 0
     assert seen_prompt_sets == ["pr1", "pr1"]
@@ -88,4 +94,7 @@ def test_single_pdf_forwards_prompt_set(tmp_path, monkeypatch, capsys):
         "output_dir": "runs",
         "prompt_set": "pr2",
     }
-    assert "Wrote run artifacts" in capsys.readouterr().out
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "summary"
+    out = capsys.readouterr().out
+    assert "Wrote final TXT" in out
+    assert "Wrote run artifacts" in out
