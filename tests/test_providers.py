@@ -160,11 +160,11 @@ def test_anthropic_provider_passes_thinking_and_effort(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     provider = AnthropicProvider(
         id="claude",
-        model="claude-opus-4-7",
+        model="claude-opus-4-8",
         config=ProviderConfig(
             id="claude",
             type="anthropic",
-            model="claude-opus-4-7",
+            model="claude-opus-4-8",
             api_key_env="ANTHROPIC_API_KEY",
             max_output_tokens=64000,
             extra={
@@ -177,7 +177,7 @@ def test_anthropic_provider_passes_thinking_and_effort(monkeypatch):
     )
 
     assert provider.generate("Consolidate this.") == "final summary"
-    assert captured["model"] == "claude-opus-4-7"
+    assert captured["model"] == "claude-opus-4-8"
     assert captured["max_tokens"] == 64000
     assert captured["thinking"] == {"type": "adaptive", "display": "omitted"}
     assert captured["output_config"] == {"effort": "xhigh"}
@@ -215,11 +215,11 @@ def test_gemini_provider_passes_thinking_budget(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     provider = GeminiProvider(
         id="gemini",
-        model="gemini-2.5-pro",
+        model="gemini-3.1-pro-preview",
         config=ProviderConfig(
             id="gemini",
             type="gemini",
-            model="gemini-2.5-pro",
+            model="gemini-3.1-pro-preview",
             api_key_env="GEMINI_API_KEY",
             max_output_tokens=16384,
             extra={"thinking_config": {"thinking_budget": 1024}},
@@ -229,7 +229,7 @@ def test_gemini_provider_passes_thinking_budget(monkeypatch):
     )
 
     assert provider.generate("Correct this.") == "corrected text"
-    assert captured["model"] == "gemini-2.5-pro"
+    assert captured["model"] == "gemini-3.1-pro-preview"
     assert captured["client_kwargs"]["http_options"] == {"timeout": 1000}
     assert captured["config_kwargs"]["max_output_tokens"] == 16384
     thinking_config = captured["config_kwargs"]["thinking_config"]
@@ -263,11 +263,11 @@ def test_gemini_provider_rejects_truncated_response(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     provider = GeminiProvider(
         id="gemini",
-        model="gemini-2.5-pro",
+        model="gemini-3.1-pro-preview",
         config=ProviderConfig(
             id="gemini",
             type="gemini",
-            model="gemini-2.5-pro",
+            model="gemini-3.1-pro-preview",
             api_key_env="GEMINI_API_KEY",
             max_output_tokens=16384,
         ),
@@ -325,11 +325,11 @@ def test_gemini_provider_sends_image_attachments(monkeypatch, tmp_path):
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     provider = GeminiProvider(
         id="gemini",
-        model="gemini-2.5-pro",
+        model="gemini-3.1-pro-preview",
         config=ProviderConfig(
             id="gemini",
             type="gemini",
-            model="gemini-2.5-pro",
+            model="gemini-3.1-pro-preview",
             api_key_env="GEMINI_API_KEY",
         ),
         timeout_seconds=1,

@@ -10,17 +10,17 @@ def test_master_config_loads():
     assert config.summary_language == "ur"
     assert config.min_summaries == 4
     assert config.correction_provider == "gemini"
-    assert config.summarisers == ["chatgpt", "gemini", "grok", "deepseek"]
-    assert config.consolidator == "claude"
+    assert config.summarisers == ["chatgpt", "claude", "grok", "deepseek"]
+    assert config.consolidator == "gemini"
     assert config.ocr["provider"] == "google_cloud_vision"
-    assert config.providers["claude"].model == "claude-opus-4-7"
+    assert config.providers["claude"].model == "claude-opus-4-8"
     assert config.providers["claude"].max_output_tokens == 64000
     assert config.providers["claude"].extra == {
         "thinking": {"type": "adaptive", "display": "omitted"},
         "output_config": {"effort": "xhigh"},
     }
     assert config.providers["chatgpt"].model == "gpt-5.2"
-    assert config.providers["gemini"].model == "gemini-2.5-pro"
+    assert config.providers["gemini"].model == "gemini-3.1-pro-preview"
     assert config.providers["gemini"].max_output_tokens == 16384
     assert config.providers["gemini"].extra == {"thinking_config": {"thinking_budget": 1024}}
     assert config.providers["grok"].type == "grok"
@@ -37,7 +37,7 @@ def test_packaged_default_config_loads():
 
     assert default_config_path().exists()
     assert config.source_path == default_config_path()
-    assert config.summarisers == ["chatgpt", "gemini", "grok", "deepseek"]
+    assert config.summarisers == ["chatgpt", "claude", "grok", "deepseek"]
     assert config.prompts["correction"].exists()
     assert config.prompt_sets_dir.exists()
     assert config.output["format"] == "txt"

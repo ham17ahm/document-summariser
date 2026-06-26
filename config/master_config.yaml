@@ -26,10 +26,10 @@ pipeline:
 
   # Independent summaries are requested from these four services.
   # Change this list if you want to add/remove a summarisation service.
-  summarisers: [chatgpt, gemini, grok, deepseek]
+  summarisers: [chatgpt, claude, grok, deepseek]
 
   # Final consolidation of the four summaries.
-  consolidator: claude
+  consolidator: gemini
 
   # Set to 4 when all four summarisation services must succeed.
   # Lower this if you want the run to continue when a provider is temporarily down.
@@ -44,7 +44,7 @@ providers:
 
   gemini:
     type: gemini
-    model: gemini-2.5-pro
+    model: gemini-3.1-pro-preview
     api_key_env: GEMINI_API_KEY
     max_output_tokens: 16384
     thinking_config:
@@ -66,7 +66,7 @@ providers:
 
   claude:
     type: anthropic
-    model: claude-opus-4-7
+    model: claude-opus-4-8
     api_key_env: ANTHROPIC_API_KEY
     max_output_tokens: 64000
     thinking:
