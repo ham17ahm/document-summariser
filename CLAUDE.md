@@ -192,12 +192,12 @@ Defaults:
 
 ```text
 OCR:          Google Cloud Vision
-Correction:   Gemini gemini-3.1-pro-preview
+Correction:   Gemini gemini-2.5-pro
 Summarisers:  ChatGPT gpt-5.2
-              Claude claude-opus-4-8
+              Claude claude-sonnet-5
               Grok grok-4.3
               DeepSeek deepseek-v4-pro
-Consolidator: Gemini gemini-3.1-pro-preview
+Consolidator: Gemini gemini-3.5-flash
 ```
 
 Important Gemini correction settings:

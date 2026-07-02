@@ -29,7 +29,7 @@ pipeline:
   summarisers: [chatgpt, claude, grok, deepseek]
 
   # Final consolidation of the four summaries.
-  consolidator: gemini
+  consolidator: gemini_consolidate
 
   # Set to 4 when all four summarisation services must succeed.
   # Lower this if you want the run to continue when a provider is temporarily down.
@@ -44,7 +44,15 @@ providers:
 
   gemini:
     type: gemini
-    model: gemini-3.1-pro-preview
+    model: gemini-2.5-pro
+    api_key_env: GEMINI_API_KEY
+    max_output_tokens: 16384
+    thinking_config:
+      thinking_budget: 1024
+
+  gemini_consolidate:
+    type: gemini
+    model: gemini-3.5-flash
     api_key_env: GEMINI_API_KEY
     max_output_tokens: 16384
     thinking_config:
@@ -66,14 +74,14 @@ providers:
 
   claude:
     type: anthropic
-    model: claude-opus-4-8
+    model: claude-sonnet-5
     api_key_env: ANTHROPIC_API_KEY
     max_output_tokens: 64000
     thinking:
       type: adaptive
       display: omitted
     output_config:
-      effort: xhigh
+      effort: high
 
 prompts:
   correction: prompts/correction.prompt.txt
