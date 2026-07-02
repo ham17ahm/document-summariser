@@ -13,21 +13,26 @@ def test_master_config_loads():
     assert config.summarisers == ["chatgpt", "claude", "grok", "deepseek"]
     assert config.consolidator == "gemini_consolidate"
     assert config.ocr["provider"] == "google_cloud_vision"
-    assert config.providers["claude"].model == "claude-sonnet-5"
+    assert config.providers["claude"].model == "claude-opus-4-7"
     assert config.providers["claude"].max_output_tokens == 64000
     assert config.providers["claude"].extra == {
+        "prompt_cache": {"enabled": True, "ttl": "5m"},
         "thinking": {"type": "adaptive", "display": "omitted"},
-        "output_config": {"effort": "xhigh"},
+        "output_config": {"effort": "high"},
     }
     assert config.providers["chatgpt"].model == "gpt-5.2"
-    assert config.providers["gemini"].model == "gemini-2.5-pro"
+    assert config.providers["chatgpt"].extra == {
+        "prompt_cache": {"enabled": True}
+    }
+    assert config.providers["gemini"].model == "gemini-2.5-flash"
     assert config.providers["gemini"].max_output_tokens == 16384
     assert config.providers["gemini"].extra == {"thinking_config": {"thinking_budget": 1024}}
-    assert config.providers["gemini_consolidate"].model == "gemini-3.5-flash"
+    assert config.providers["gemini_consolidate"].model == "gemini-3.1-pro-preview"
     assert config.providers["gemini_consolidate"].max_output_tokens == 16384
     assert config.providers["gemini_consolidate"].extra == {"thinking_config": {"thinking_budget": 1024}}
     assert config.providers["grok"].type == "grok"
     assert config.providers["grok"].base_url == "https://api.x.ai/v1"
+    assert config.providers["grok"].extra == {"prompt_cache": {"enabled": True}}
     assert config.providers["deepseek"].model == "deepseek-v4-pro"
     assert config.providers["deepseek"].type == "deepseek"
     assert config.prompt_sets_dir == Path("prompts/sets").resolve()

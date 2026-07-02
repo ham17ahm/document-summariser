@@ -19,6 +19,8 @@ providers:
     model: gpt-5.2
     api_key_env: OPENAI_API_KEY
     max_output_tokens: 4096
+    prompt_cache:
+      enabled: true
   gemini:
     type: gemini
     model: gemini-3.1-pro-preview
@@ -32,6 +34,8 @@ providers:
     api_key_env: XAI_API_KEY
     base_url: https://api.x.ai/v1
     max_output_tokens: 4096
+    prompt_cache:
+      enabled: true
   deepseek:
     type: deepseek
     model: deepseek-v4-pro
@@ -43,6 +47,9 @@ providers:
     model: claude-opus-4-8
     api_key_env: ANTHROPIC_API_KEY
     max_output_tokens: 64000
+    prompt_cache:
+      enabled: true
+      ttl: 5m
     thinking:
       type: adaptive
       display: omitted

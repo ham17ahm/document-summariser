@@ -8,12 +8,15 @@ from document_summariser.errors import ConfigError
 from document_summariser.providers.base import (
     AnthropicProvider,
     BaseCloudProvider,
+    GenerationResult,
     GeminiProvider,
     OpenAICompatibleProvider,
     ProviderError,
     RetryPolicy,
+    XAIProvider,
 )
 from document_summariser.providers.registry import build_provider_registry
+from document_summariser.prompts import PromptRequest
 
 
 def test_cloud_provider_requires_configured_api_key(monkeypatch):
@@ -32,14 +35,14 @@ def test_cloud_provider_requires_configured_api_key(monkeypatch):
     )
 
     with pytest.raises(ProviderError, match="OPENAI_API_KEY"):
-        provider.generate("Summarise this.")
+        provider.generate(_request("Summarise this."))
 
 
 def test_retry_skips_non_retryable_errors():
     calls = {"count": 0}
 
     class FailingProvider(BaseCloudProvider):
-        def _generate_once(self, prompt: str) -> str:
+        def _generate_once(self, request: PromptRequest) -> GenerationResult:
             calls["count"] += 1
             raise ProviderError("bad request", retryable=False)
 
@@ -52,7 +55,7 @@ def test_retry_skips_non_retryable_errors():
     )
 
     with pytest.raises(ProviderError, match="bad request"):
-        provider.generate("Summarise this.")
+        provider.generate(_request("Summarise this."))
     assert calls["count"] == 1
 
 
@@ -60,11 +63,11 @@ def test_retry_retries_transient_errors():
     calls = {"count": 0}
 
     class FlakyProvider(BaseCloudProvider):
-        def _generate_once(self, prompt: str) -> str:
+        def _generate_once(self, request: PromptRequest) -> GenerationResult:
             calls["count"] += 1
             if calls["count"] < 2:
                 raise RuntimeError("transient network error")
-            return "ok"
+            return GenerationResult("ok")
 
     provider = FlakyProvider(
         id="p",
@@ -74,7 +77,7 @@ def test_retry_retries_transient_errors():
         retry_policy=RetryPolicy(attempts=3, initial_delay_seconds=0),
     )
 
-    assert provider.generate("Summarise this.") == "ok"
+    assert provider.generate(_request("Summarise this.")).text == "ok"
     assert calls["count"] == 2
 
 
@@ -85,7 +88,7 @@ def test_retry_skips_non_retryable_http_status():
         status_code = 400
 
     class FailingProvider(BaseCloudProvider):
-        def _generate_once(self, prompt: str) -> str:
+        def _generate_once(self, request: PromptRequest) -> GenerationResult:
             calls["count"] += 1
             raise BadRequestError("invalid request")
 
@@ -98,7 +101,7 @@ def test_retry_skips_non_retryable_http_status():
     )
 
     with pytest.raises(ProviderError, match="invalid request"):
-        provider.generate("Summarise this.")
+        provider.generate(_request("Summarise this."))
     assert calls["count"] == 1
 
 
@@ -129,9 +132,86 @@ def test_registry_builds_grok_as_openai_compatible_provider():
     registry = build_provider_registry(config)
 
     provider = registry["grok"]
-    assert isinstance(provider, OpenAICompatibleProvider)
+    assert isinstance(provider, XAIProvider)
     assert provider.max_tokens_parameter == "max_tokens"
     assert provider.config.base_url == "https://api.x.ai/v1"
+
+
+def test_openai_provider_sends_cache_key_and_records_cache_usage(monkeypatch):
+    captured: dict = {}
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="summary"))],
+                usage=SimpleNamespace(
+                    prompt_tokens=2000,
+                    completion_tokens=100,
+                    prompt_tokens_details=SimpleNamespace(cached_tokens=1500),
+                    completion_tokens_details=SimpleNamespace(reasoning_tokens=25),
+                ),
+            )
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            self.chat = SimpleNamespace(completions=FakeCompletions())
+
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=FakeOpenAI))
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    provider = OpenAICompatibleProvider(
+        id="chatgpt",
+        model="gpt-5.2",
+        config=ProviderConfig(
+            id="chatgpt",
+            type="openai",
+            model="gpt-5.2",
+            api_key_env="OPENAI_API_KEY",
+            extra={
+                "prompt_cache": {
+                    "enabled": True,
+                    "retention": "in_memory",
+                }
+            },
+        ),
+        timeout_seconds=1,
+        retry_policy=RetryPolicy(attempts=1, initial_delay_seconds=0),
+    )
+
+    result = provider.generate(_request("Document text"))
+
+    assert result.text == "summary"
+    assert captured["messages"][0] == {
+        "role": "system",
+        "content": "Stable system instructions.",
+    }
+    assert captured["prompt_cache_key"] == "cache-key"
+    assert captured["prompt_cache_retention"] == "in_memory"
+    assert result.usage.cached_input_tokens == 1500
+    assert result.usage.cache_miss_input_tokens == 500
+    assert result.usage.reasoning_tokens == 25
+
+
+def test_xai_provider_sends_sticky_routing_header():
+    provider = XAIProvider(
+        id="grok",
+        model="grok-4.3",
+        config=ProviderConfig(
+            id="grok",
+            type="grok",
+            model="grok-4.3",
+            extra={"prompt_cache": {"enabled": True}},
+        ),
+        timeout_seconds=1,
+        retry_policy=RetryPolicy(attempts=1, initial_delay_seconds=0),
+        max_tokens_parameter="max_tokens",
+    )
+
+    assert provider._cache_request_options(_request("Document text")) == {
+        "extra_headers": {
+            "x-grok-conv-id": "cache-key",
+        }
+    }
 
 
 def test_anthropic_provider_passes_thinking_and_effort(monkeypatch):
@@ -144,7 +224,13 @@ def test_anthropic_provider_passes_thinking_and_effort(monkeypatch):
                 content=[
                     SimpleNamespace(type="thinking", thinking=""),
                     SimpleNamespace(type="text", text="final summary"),
-                ]
+                ],
+                usage=SimpleNamespace(
+                    input_tokens=200,
+                    output_tokens=50,
+                    cache_read_input_tokens=1800,
+                    cache_creation_input_tokens=0,
+                ),
             )
 
     class FakeAnthropic:
@@ -168,6 +254,7 @@ def test_anthropic_provider_passes_thinking_and_effort(monkeypatch):
             api_key_env="ANTHROPIC_API_KEY",
             max_output_tokens=64000,
             extra={
+                "prompt_cache": {"enabled": True, "ttl": "5m"},
                 "thinking": {"type": "adaptive", "display": "omitted"},
                 "output_config": {"effort": "xhigh"},
             },
@@ -176,11 +263,23 @@ def test_anthropic_provider_passes_thinking_and_effort(monkeypatch):
         retry_policy=RetryPolicy(attempts=1, initial_delay_seconds=0),
     )
 
-    assert provider.generate("Consolidate this.") == "final summary"
+    result = provider.generate(_request("Consolidate this."))
+    assert result.text == "final summary"
     assert captured["model"] == "claude-opus-4-8"
     assert captured["max_tokens"] == 64000
     assert captured["thinking"] == {"type": "adaptive", "display": "omitted"}
     assert captured["output_config"] == {"effort": "xhigh"}
+    assert captured["system"] == [
+        {
+            "type": "text",
+            "text": "Stable system instructions.",
+            "cache_control": {"type": "ephemeral", "ttl": "5m"},
+        }
+    ]
+    assert captured["messages"] == [{"role": "user", "content": "Consolidate this."}]
+    assert result.usage.input_tokens == 2000
+    assert result.usage.cached_input_tokens == 1800
+    assert result.usage.cache_miss_input_tokens == 200
 
 
 def test_gemini_provider_passes_thinking_budget(monkeypatch):
@@ -197,7 +296,15 @@ def test_gemini_provider_passes_thinking_budget(monkeypatch):
     class FakeModels:
         def generate_content(self, **kwargs):
             captured.update(kwargs)
-            return SimpleNamespace(text="corrected text")
+            return SimpleNamespace(
+                text="corrected text",
+                usage_metadata=SimpleNamespace(
+                    prompt_token_count=3000,
+                    candidates_token_count=500,
+                    cached_content_token_count=2000,
+                    thoughts_token_count=100,
+                ),
+            )
 
     class FakeClient:
         def __init__(self, **kwargs):
@@ -228,12 +335,16 @@ def test_gemini_provider_passes_thinking_budget(monkeypatch):
         retry_policy=RetryPolicy(attempts=1, initial_delay_seconds=0),
     )
 
-    assert provider.generate("Correct this.") == "corrected text"
+    result = provider.generate(_request("Correct this."))
+    assert result.text == "corrected text"
     assert captured["model"] == "gemini-3.1-pro-preview"
     assert captured["client_kwargs"]["http_options"] == {"timeout": 1000}
     assert captured["config_kwargs"]["max_output_tokens"] == 16384
     thinking_config = captured["config_kwargs"]["thinking_config"]
     assert thinking_config.kwargs == {"thinking_budget": 1024}
+    assert captured["config_kwargs"]["system_instruction"] == "Stable system instructions."
+    assert result.usage.cached_input_tokens == 2000
+    assert result.usage.cache_miss_input_tokens == 1000
 
 
 def test_gemini_provider_rejects_truncated_response(monkeypatch):
@@ -276,7 +387,7 @@ def test_gemini_provider_rejects_truncated_response(monkeypatch):
     )
 
     with pytest.raises(ProviderError, match="max_output_tokens"):
-        provider.generate("Correct this.")
+        provider.generate(_request("Correct this."))
     assert calls["count"] == 1
 
 
@@ -336,7 +447,10 @@ def test_gemini_provider_sends_image_attachments(monkeypatch, tmp_path):
         retry_policy=RetryPolicy(attempts=1, initial_delay_seconds=0),
     )
 
-    assert provider.generate("Correct this.", attachments=[str(image_path)]) == "corrected text"
+    assert (
+        provider.generate(_request("Correct this."), attachments=[str(image_path)]).text
+        == "corrected text"
+    )
     contents = captured["contents"]
     assert len(contents) == 1
     assert contents[0].role == "user"
@@ -370,3 +484,11 @@ def _provider_registry_config():
         }
 
     return Config()
+
+
+def _request(user: str) -> PromptRequest:
+    return PromptRequest(
+        system="Stable system instructions.",
+        user=user,
+        cache_key="cache-key",
+    )

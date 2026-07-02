@@ -286,7 +286,7 @@ summarise --help
 Expected current test result:
 
 ```text
-40 passed
+46 passed
 ```
 
 On Windows/sandbox setups, pytest may need to run outside the sandbox because temp directories can receive ACLs the sandbox cannot scan.

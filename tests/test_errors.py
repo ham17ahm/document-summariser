@@ -7,6 +7,8 @@ from document_summariser.artifacts import ArtifactStore
 from document_summariser.config import load_config
 from document_summariser.errors import PipelineStageError, ProviderError
 from document_summariser.ocr import OcrPage, OcrResult
+from document_summariser.prompts import PromptRequest
+from document_summariser.providers.base import GenerationResult
 from document_summariser.stages.context import RunContext
 from document_summariser.stages.pipeline import Pipeline
 
@@ -72,15 +74,23 @@ class StaticProvider:
         self.supports_attachments = False
         self.response = response
 
-    def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
-        return self.response
+    def generate(
+        self,
+        request: PromptRequest,
+        attachments: list[str] | None = None,
+    ) -> GenerationResult:
+        return GenerationResult(self.response)
 
 
 class FailingProvider(StaticProvider):
     def __init__(self, provider_id: str, model: str) -> None:
         super().__init__(provider_id, model, "")
 
-    def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
+    def generate(
+        self,
+        request: PromptRequest,
+        attachments: list[str] | None = None,
+    ) -> GenerationResult:
         raise ProviderError(
             "API request failed: api_key=sk-test-secret-123456789012",
             details={"provider": self.id, "model": self.model},

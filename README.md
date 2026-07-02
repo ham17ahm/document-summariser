@@ -107,6 +107,12 @@ Common changes should be made in:
 - `providers.<name>.model` to change a provider model.
 - `runtime.concurrency`, `runtime.retries`, and `runtime.request_timeout_seconds` for operational tuning.
 
+Model requests separate stable instructions from variable document content so provider-side
+prompt caches can reuse the common prefix. OpenAI and xAI routing hints and Claude's
+five-minute cache are enabled through each provider's `prompt_cache` config. Gemini and
+DeepSeek use their automatic caches. Cache reads, writes, and hit ratios are recorded under
+`provider_usage` in `manifest.json` when the provider returns usage metadata.
+
 Prompt sets live under `prompts/sets/<name>/`. Each set must contain:
 
 - `summarise.prompt.txt`

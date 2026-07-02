@@ -5,7 +5,7 @@ from time import perf_counter
 
 from document_summariser.errors import PipelineStageError, exception_summary
 from document_summariser.prompts import load_prompt
-from document_summariser.providers.base import ProviderAdapter
+from document_summariser.providers.base import GenerationResult, ProviderAdapter
 from document_summariser.stages.context import RunContext
 
 
@@ -75,9 +75,19 @@ class Pipeline:
                 "sent": len(attachments or []),
                 "provider_supports_attachments": bool(getattr(provider, "supports_attachments", False)),
             }
-        corrected = provider.generate(
-            prompt.render(ocr_text=context.ocr_text),
+        result = provider.generate(
+            prompt.render_request(
+                dynamic_variables={"ocr_text"},
+                ocr_text=context.ocr_text,
+            ),
             attachments=attachments,
+        )
+        corrected = result.text
+        self._record_provider_usage(
+            context,
+            "correction",
+            context.config.correction_provider,
+            result,
         )
         context.corrected_text = corrected
         context.artifacts.write_text("02_corrected.txt", corrected)
@@ -116,23 +126,31 @@ class Pipeline:
             int(context.config.runtime.get("concurrency", 4)),
             max(len(context.config.summarisers), 1),
         )
-        rendered = prompt.render(
+        request = prompt.render_request(
+            dynamic_variables={"document"},
             document=context.corrected_text,
             summary_language=context.config.summary_language,
         )
 
-        def call(provider_id: str) -> tuple[str, str]:
+        def call(provider_id: str) -> tuple[str, GenerationResult]:
             provider = context.providers[provider_id]
-            return provider_id, provider.generate(rendered)
+            return provider_id, provider.generate(request)
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(call, provider_id): provider_id for provider_id in context.config.summarisers}
             for future in as_completed(futures):
                 provider_id = futures[future]
                 try:
-                    _, summary = future.result()
+                    _, result = future.result()
+                    summary = result.text
                     successes[provider_id] = summary
                     context.artifacts.write_text(f"03_summaries/{provider_id}.txt", summary)
+                    self._record_provider_usage(
+                        context,
+                        "summarisation",
+                        provider_id,
+                        result,
+                    )
                 except Exception as exc:
                     provider = context.providers[provider_id]
                     provider_error = exception_summary(exc)
@@ -188,12 +206,26 @@ class Pipeline:
             for index in range(1, 5)
         }
         provider = context.providers[context.config.consolidator]
-        consolidated = provider.generate(
-            prompt.render(
+        result = provider.generate(
+            prompt.render_request(
+                dynamic_variables={
+                    "summaries",
+                    "summary1",
+                    "summary2",
+                    "summary3",
+                    "summary4",
+                },
                 summaries=labelled,
                 summary_language=context.config.summary_language,
                 **summary_variables,
             )
+        )
+        consolidated = result.text
+        self._record_provider_usage(
+            context,
+            "consolidation",
+            context.config.consolidator,
+            result,
         )
         context.consolidated_summary = consolidated
         context.artifacts.write_text("04_consolidated.txt", consolidated)
@@ -205,3 +237,16 @@ class Pipeline:
     def _write_text_output(self, context: RunContext) -> None:
         output_path = context.artifacts.write_text("05_output.txt", context.consolidated_summary)
         context.manifest["output_text"] = str(output_path)
+
+    def _record_provider_usage(
+        self,
+        context: RunContext,
+        stage: str,
+        provider_id: str,
+        result: GenerationResult,
+    ) -> None:
+        usage = result.usage.to_manifest()
+        if usage:
+            context.manifest.setdefault("provider_usage", {}).setdefault(stage, {})[
+                provider_id
+            ] = usage

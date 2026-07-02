@@ -12,6 +12,7 @@ from document_summariser.providers.base import (
     OpenAICompatibleProvider,
     ProviderAdapter,
     RetryPolicy,
+    XAIProvider,
 )
 
 ProviderFactory = type[BaseCloudProvider]
@@ -45,7 +46,7 @@ def _build_deepseek_provider(provider: ProviderConfig, timeout_seconds: float, r
 
 
 def _build_grok_provider(provider: ProviderConfig, timeout_seconds: float, retry_policy: RetryPolicy) -> ProviderAdapter:
-    return OpenAICompatibleProvider(
+    return XAIProvider(
         id=provider.id,
         model=provider.model,
         config=provider,

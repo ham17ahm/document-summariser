@@ -5,6 +5,8 @@ from document_summariser.artifacts import ArtifactStore
 from document_summariser.config import load_config
 from document_summariser.ocr import OcrPage, OcrResult
 from document_summariser.ocr import build_ocr_adapter
+from document_summariser.prompts import PromptRequest
+from document_summariser.providers.base import GenerationResult, ProviderUsage
 from document_summariser.providers.registry import build_provider_registry
 from document_summariser.stages.context import RunContext
 from document_summariser.stages.pipeline import Pipeline
@@ -152,6 +154,42 @@ def test_pipeline_warns_when_correction_is_suspiciously_short(tmp_path):
     assert warning["ocr_characters"] == len(long_ocr_text.strip())
 
 
+def test_pipeline_records_cache_usage_without_prompt_content(tmp_path):
+    pdf = tmp_path / "sample.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n% placeholder\n")
+    config = load_config(_write_order_config(tmp_path))
+    artifacts = ArtifactStore(tmp_path / "run")
+
+    context = RunContext(
+        input_pdf=pdf,
+        config=config,
+        artifacts=artifacts,
+        ocr=StaticOcrAdapter(None),
+        providers={
+            "corrector": StaticProvider(
+                "corrector",
+                "test-model",
+                "corrected text",
+                usage=ProviderUsage(input_tokens=100, cached_input_tokens=80),
+            ),
+            "slow": StaticProvider("slow", "test-model", "slow summary"),
+            "fast": StaticProvider("fast", "test-model", "fast summary"),
+            "consolidator": StaticProvider("consolidator", "test-model", "final summary"),
+        },
+        manifest={"input_file": str(pdf), "config_file": str(config.source_path)},
+    )
+
+    Pipeline().run(context)
+
+    usage = context.manifest["provider_usage"]["correction"]["corrector"]
+    assert usage == {
+        "input_tokens": 100,
+        "cached_input_tokens": 80,
+        "cache_hit_ratio": 0.8,
+    }
+    assert "corrected text" not in str(context.manifest["provider_usage"])
+
+
 class StaticProvider:
     def __init__(
         self,
@@ -159,14 +197,20 @@ class StaticProvider:
         model: str,
         response: str,
         supports_attachments: bool = False,
+        usage: ProviderUsage = ProviderUsage(),
     ) -> None:
         self.id = provider_id
         self.model = model
         self.response = response
         self.supports_attachments = supports_attachments
+        self.usage = usage
 
-    def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
-        return self.response
+    def generate(
+        self,
+        request: PromptRequest,
+        attachments: list[str] | None = None,
+    ) -> GenerationResult:
+        return GenerationResult(self.response, self.usage)
 
 
 class DelayedProvider(StaticProvider):
@@ -174,9 +218,13 @@ class DelayedProvider(StaticProvider):
         super().__init__(provider_id, model, response)
         self.delay_seconds = delay_seconds
 
-    def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
+    def generate(
+        self,
+        request: PromptRequest,
+        attachments: list[str] | None = None,
+    ) -> GenerationResult:
         sleep(self.delay_seconds)
-        return super().generate(prompt, attachments)
+        return super().generate(request, attachments)
 
 
 class RecordingProvider(StaticProvider):
@@ -185,10 +233,14 @@ class RecordingProvider(StaticProvider):
         self.last_prompt = ""
         self.last_attachments = None
 
-    def generate(self, prompt: str, attachments: list[str] | None = None) -> str:
-        self.last_prompt = prompt
+    def generate(
+        self,
+        request: PromptRequest,
+        attachments: list[str] | None = None,
+    ) -> GenerationResult:
+        self.last_prompt = f"{request.system}{request.user}"
         self.last_attachments = attachments
-        return super().generate(prompt, attachments)
+        return super().generate(request, attachments)
 
 
 class StaticOcrAdapter:
