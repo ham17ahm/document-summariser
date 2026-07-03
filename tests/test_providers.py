@@ -345,6 +345,49 @@ def test_gemini_provider_passes_thinking_budget(monkeypatch):
     assert captured["config_kwargs"]["system_instruction"] == "Stable system instructions."
     assert result.usage.cached_input_tokens == 2000
     assert result.usage.cache_miss_input_tokens == 1000
+    assert result.avg_logprobs is None
+
+
+def test_gemini_provider_reads_avg_logprobs(monkeypatch):
+    class FakeGenerateContentConfig:
+        def __init__(self, **kwargs):
+            pass
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            return SimpleNamespace(
+                text="corrected text",
+                candidates=[
+                    SimpleNamespace(finish_reason="FinishReason.STOP", avg_logprobs=-0.15)
+                ],
+            )
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.models = FakeModels()
+
+    fake_types = SimpleNamespace(GenerateContentConfig=FakeGenerateContentConfig)
+    fake_genai = SimpleNamespace(Client=FakeClient, types=fake_types)
+    monkeypatch.setitem(sys.modules, "google", SimpleNamespace(genai=fake_genai))
+    monkeypatch.setitem(sys.modules, "google.genai", fake_genai)
+    monkeypatch.setitem(sys.modules, "google.genai.types", fake_types)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    provider = GeminiProvider(
+        id="gemini",
+        model="gemini-3.1-pro-preview",
+        config=ProviderConfig(
+            id="gemini",
+            type="gemini",
+            model="gemini-3.1-pro-preview",
+            api_key_env="GEMINI_API_KEY",
+        ),
+        timeout_seconds=1,
+        retry_policy=RetryPolicy(attempts=1, initial_delay_seconds=0),
+    )
+
+    result = provider.generate(_request("Correct this."))
+    assert result.text == "corrected text"
+    assert result.avg_logprobs == -0.15
 
 
 def test_gemini_provider_rejects_truncated_response(monkeypatch):

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from difflib import SequenceMatcher
 from time import perf_counter
 
 from document_summariser.errors import PipelineStageError, exception_summary
@@ -63,6 +65,19 @@ class Pipeline:
         ]
         if not context.ocr_text.strip():
             raise RuntimeError("OCR completed but produced no text.")
+        confidences = [page.confidence for page in result.pages if page.confidence is not None]
+        context.manifest.setdefault("quality", {})["ocr"] = {
+            "pages": len(result.pages),
+            "average_confidence": (
+                round(sum(confidences) / len(confidences), 4) if confidences else None
+            ),
+            "low_confidence_pages": [
+                page.page_number for page in result.pages if page.low_confidence
+            ],
+            "low_confidence_threshold": float(
+                context.config.ocr.get("low_confidence_threshold", 0.8)
+            ),
+        }
         context.artifacts.write_json("01_ocr.json", result.to_json())
 
     def _correct(self, context: RunContext) -> None:
@@ -91,6 +106,20 @@ class Pipeline:
         )
         context.corrected_text = corrected
         context.artifacts.write_text("02_corrected.txt", corrected)
+        # Word-level similarity keeps SequenceMatcher fast on long documents;
+        # a low ratio flags pages where OCR was poor or the model rewrote heavily.
+        similarity = round(
+            SequenceMatcher(None, context.ocr_text.split(), corrected.split()).ratio(), 4
+        )
+        avg_logprobs = result.avg_logprobs
+        context.manifest.setdefault("quality", {})["correction"] = {
+            "avg_logprobs": avg_logprobs,
+            "avg_token_probability": (
+                round(math.exp(avg_logprobs), 4) if avg_logprobs is not None else None
+            ),
+            "similarity_to_ocr": similarity,
+            "change_ratio": round(1 - similarity, 4),
+        }
         # Correction should roughly preserve length; a much shorter result
         # usually means the provider truncated its output.
         ocr_characters = len(context.ocr_text.strip())

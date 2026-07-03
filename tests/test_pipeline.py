@@ -190,6 +190,78 @@ def test_pipeline_records_cache_usage_without_prompt_content(tmp_path):
     assert "corrected text" not in str(context.manifest["provider_usage"])
 
 
+def test_pipeline_records_ocr_confidence_in_manifest(tmp_path):
+    pdf = tmp_path / "sample.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n% placeholder\n")
+    config = load_config(_write_order_config(tmp_path))
+    artifacts = ArtifactStore(tmp_path / "run")
+    pages = [
+        OcrPage(page_number=1, text="page one", confidence=0.95, low_confidence=False, image_path=None),
+        OcrPage(page_number=2, text="page two", confidence=0.6, low_confidence=True, image_path=None),
+    ]
+
+    context = RunContext(
+        input_pdf=pdf,
+        config=config,
+        artifacts=artifacts,
+        ocr=StaticOcrAdapter(None, pages=pages),
+        providers={
+            "corrector": StaticProvider("corrector", "test-model", "corrected text"),
+            "slow": StaticProvider("slow", "test-model", "slow summary"),
+            "fast": StaticProvider("fast", "test-model", "fast summary"),
+            "consolidator": StaticProvider("consolidator", "test-model", "final summary"),
+        },
+        manifest={"input_file": str(pdf), "config_file": str(config.source_path)},
+    )
+
+    Pipeline().run(context)
+
+    assert context.manifest["quality"]["ocr"] == {
+        "pages": 2,
+        "average_confidence": 0.775,
+        "low_confidence_pages": [2],
+        "low_confidence_threshold": 0.8,
+    }
+    # The default StaticProvider reports no avg_logprobs; that must degrade to None.
+    assert context.manifest["quality"]["correction"]["avg_logprobs"] is None
+    assert context.manifest["quality"]["correction"]["avg_token_probability"] is None
+
+
+def test_pipeline_records_correction_confidence_in_manifest(tmp_path):
+    pdf = tmp_path / "sample.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n% placeholder\n")
+    config = load_config(_write_order_config(tmp_path))
+    artifacts = ArtifactStore(tmp_path / "run")
+
+    context = RunContext(
+        input_pdf=pdf,
+        config=config,
+        artifacts=artifacts,
+        ocr=StaticOcrAdapter(None, text="one two three four"),
+        providers={
+            "corrector": StaticProvider(
+                "corrector",
+                "test-model",
+                "one two three five",
+                avg_logprobs=-0.15,
+            ),
+            "slow": StaticProvider("slow", "test-model", "slow summary"),
+            "fast": StaticProvider("fast", "test-model", "fast summary"),
+            "consolidator": StaticProvider("consolidator", "test-model", "final summary"),
+        },
+        manifest={"input_file": str(pdf), "config_file": str(config.source_path)},
+    )
+
+    Pipeline().run(context)
+
+    correction = context.manifest["quality"]["correction"]
+    assert correction["avg_logprobs"] == -0.15
+    assert correction["avg_token_probability"] == 0.8607
+    # Three of four words survive the correction: ratio 2*3/(4+4) = 0.75.
+    assert correction["similarity_to_ocr"] == 0.75
+    assert correction["change_ratio"] == 0.25
+
+
 class StaticProvider:
     def __init__(
         self,
@@ -198,19 +270,21 @@ class StaticProvider:
         response: str,
         supports_attachments: bool = False,
         usage: ProviderUsage = ProviderUsage(),
+        avg_logprobs: float | None = None,
     ) -> None:
         self.id = provider_id
         self.model = model
         self.response = response
         self.supports_attachments = supports_attachments
         self.usage = usage
+        self.avg_logprobs = avg_logprobs
 
     def generate(
         self,
         request: PromptRequest,
         attachments: list[str] | None = None,
     ) -> GenerationResult:
-        return GenerationResult(self.response, self.usage)
+        return GenerationResult(self.response, self.usage, avg_logprobs=self.avg_logprobs)
 
 
 class DelayedProvider(StaticProvider):
@@ -244,23 +318,27 @@ class RecordingProvider(StaticProvider):
 
 
 class StaticOcrAdapter:
-    def __init__(self, image_path: str | None, text: str = "OCR text") -> None:
+    def __init__(
+        self,
+        image_path: str | None,
+        text: str = "OCR text",
+        pages: list[OcrPage] | None = None,
+    ) -> None:
         self.image_path = image_path
         self.text = text
+        self.pages = pages
 
     def extract(self, pdf_path: Path, artifacts: ArtifactStore) -> OcrResult:
-        return OcrResult(
-            provider="static",
-            pages=[
-                OcrPage(
-                    page_number=1,
-                    text=self.text,
-                    confidence=None,
-                    low_confidence=False,
-                    image_path=self.image_path,
-                )
-            ],
-        )
+        pages = self.pages or [
+            OcrPage(
+                page_number=1,
+                text=self.text,
+                confidence=None,
+                low_confidence=False,
+                image_path=self.image_path,
+            )
+        ]
+        return OcrResult(provider="static", pages=pages)
 
 
 def _write_mock_config(tmp_path: Path) -> Path:

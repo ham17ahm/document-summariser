@@ -86,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Wrote final TXT to {final_text}")
             if args.publish_final:
                 print(f"Wrote final TXT to {publish_final_text(result)}")
+            _print_quality_summary(result)
             print(f"Wrote run artifacts to {result.artifacts.root}")
             return 0
         except Exception as exc:  # noqa: BLE001 - CLI boundary must render all runtime failures
@@ -131,12 +132,51 @@ def _run_concurrent(
                 result = future.result()
                 if publish_final:
                     print(f"[{label}] Wrote final TXT to {publish_final_text(result)}")
+                _print_quality_summary(result, label=label)
                 print(f"[{label}] Wrote run artifacts to {result.artifacts.root}")
             except Exception as exc:  # noqa: BLE001 - report per-PDF failures without stopping others
                 any_failed = True
                 print(f"[{label}] Failed:", file=sys.stderr)
                 print_cli_error(exc, sys.stderr, debug=debug)
     return 1 if any_failed else 0
+
+
+def _print_quality_summary(result: SummaryRunResult, label: str | None = None) -> None:
+    prefix = f"[{label}] " if label else ""
+    quality = result.context.manifest.get("quality") or {}
+
+    ocr = quality.get("ocr") or {}
+    ocr_parts: list[str] = []
+    average = ocr.get("average_confidence")
+    if average is not None:
+        ocr_parts.append(f"{average * 100:.1f}% average over {ocr.get('pages', '?')} pages")
+        flagged = ocr.get("low_confidence_pages") or []
+        threshold = ocr.get("low_confidence_threshold")
+        if flagged:
+            pages = ", ".join(str(page) for page in flagged)
+            ocr_parts.append(f"low-confidence pages: {pages}")
+        elif threshold is not None:
+            ocr_parts.append(f"all pages above {threshold * 100:.0f}% threshold")
+    if ocr_parts:
+        print(f"{prefix}OCR confidence: {'; '.join(ocr_parts)}")
+
+    correction = quality.get("correction") or {}
+    correction_parts: list[str] = []
+    token_probability = correction.get("avg_token_probability")
+    if token_probability is not None:
+        correction_parts.append(
+            f"model token confidence ~{token_probability * 100:.0f}% "
+            f"(avg_logprobs {correction.get('avg_logprobs'):.2f})"
+        )
+    change_ratio = correction.get("change_ratio")
+    if change_ratio is not None:
+        correction_parts.append(f"{change_ratio * 100:.1f}% of text changed vs OCR")
+    if correction_parts:
+        print(f"{prefix}Correction: {'; '.join(correction_parts)}")
+
+    warning = result.context.manifest.get("correction_warning")
+    if warning:
+        print(f"{prefix}Warning: {warning.get('reason', 'correction quality warning')}")
 
 
 def copy_final_text(source: Path, destination: Path) -> Path:

@@ -1,7 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from document_summariser.cli import build_parser, main
+from document_summariser.cli import _print_quality_summary, build_parser, main
 
 
 def test_parser_caps_multi_pdf_parallelism_by_default():
@@ -46,6 +46,7 @@ def test_publish_final_supported_for_multiple_pdfs(tmp_path, monkeypatch, capsys
             input_pdf=pdf,
             config=SimpleNamespace(output={}),
             artifacts=SimpleNamespace(root=tmp_path / "runs" / pdf.stem),
+            context=SimpleNamespace(manifest={}),
             output_text_path=text_path,
         )
 
@@ -80,6 +81,7 @@ def test_single_pdf_forwards_prompt_set(tmp_path, monkeypatch, capsys):
             input_pdf=tmp_path / Path(pdf_path).name,
             config=SimpleNamespace(output={}),
             artifacts=SimpleNamespace(root=tmp_path / "runs"),
+            context=SimpleNamespace(manifest={}),
             output_text_path=text_path,
         )
 
@@ -98,3 +100,66 @@ def test_single_pdf_forwards_prompt_set(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "Wrote final TXT" in out
     assert "Wrote run artifacts" in out
+
+
+def _quality_result(manifest: dict) -> SimpleNamespace:
+    return SimpleNamespace(context=SimpleNamespace(manifest=manifest))
+
+
+def test_print_quality_summary_reports_both_stages(capsys):
+    manifest = {
+        "quality": {
+            "ocr": {
+                "pages": 12,
+                "average_confidence": 0.912,
+                "low_confidence_pages": [3, 7],
+                "low_confidence_threshold": 0.8,
+            },
+            "correction": {
+                "avg_logprobs": -0.14,
+                "avg_token_probability": 0.8694,
+                "similarity_to_ocr": 0.959,
+                "change_ratio": 0.041,
+            },
+        },
+        "correction_warning": {"reason": "Corrected text is much shorter than the OCR text."},
+    }
+
+    _print_quality_summary(_quality_result(manifest), label="a.pdf")
+
+    out = capsys.readouterr().out
+    assert "[a.pdf] OCR confidence: 91.2% average over 12 pages; low-confidence pages: 3, 7" in out
+    assert "[a.pdf] Correction: model token confidence ~87% (avg_logprobs -0.14); 4.1% of text changed vs OCR" in out
+    assert "[a.pdf] Warning: Corrected text is much shorter than the OCR text." in out
+
+
+def test_print_quality_summary_handles_missing_confidence(capsys):
+    manifest = {
+        "quality": {
+            "ocr": {
+                "pages": 2,
+                "average_confidence": None,
+                "low_confidence_pages": [],
+                "low_confidence_threshold": 0.8,
+            },
+            "correction": {
+                "avg_logprobs": None,
+                "avg_token_probability": None,
+                "similarity_to_ocr": 0.98,
+                "change_ratio": 0.02,
+            },
+        }
+    }
+
+    _print_quality_summary(_quality_result(manifest))
+
+    out = capsys.readouterr().out
+    assert "OCR confidence" not in out
+    assert "avg_logprobs" not in out
+    assert "Correction: 2.0% of text changed vs OCR" in out
+
+
+def test_print_quality_summary_is_silent_without_quality_data(capsys):
+    _print_quality_summary(_quality_result({}))
+
+    assert capsys.readouterr().out == ""

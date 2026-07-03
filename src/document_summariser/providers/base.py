@@ -79,6 +79,10 @@ class ProviderUsage:
 class GenerationResult:
     text: str
     usage: ProviderUsage = ProviderUsage()
+    # Length-normalised mean log-probability of the generated tokens. Only
+    # populated by providers that expose it (currently Gemini); an uncalibrated
+    # confidence proxy, not an accuracy guarantee.
+    avg_logprobs: float | None = None
 
 
 @dataclass
@@ -434,6 +438,7 @@ class GeminiProvider(BaseCloudProvider):
             cached_tokens = _optional_int_attr(usage, "cached_content_token_count")
             return GenerationResult(
                 text=text,
+                avg_logprobs=_first_candidate_avg_logprobs(response),
                 usage=ProviderUsage(
                     input_tokens=input_tokens,
                     output_tokens=_optional_int_attr(usage, "candidates_token_count"),
@@ -479,6 +484,17 @@ def _mime_type_for_path(path: str) -> str:
 def _optional_int_attr(value: object, name: str) -> int | None:
     candidate = getattr(value, name, None)
     return candidate if isinstance(candidate, int) else None
+
+
+def _first_candidate_avg_logprobs(response: object) -> float | None:
+    # avg_logprobs is absent on some model/thinking configurations, so read it
+    # defensively and treat anything non-numeric as unavailable.
+    for candidate in getattr(response, "candidates", []) or []:
+        value = getattr(candidate, "avg_logprobs", None)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+        return None
+    return None
 
 
 def _sum_optional(*values: int | None) -> int | None:
