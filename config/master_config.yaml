@@ -10,72 +10,89 @@
 #
 # API keys and Google credential files are intentionally not stored here.
 # Put secret values in .env using the environment variable names below.
-
+#
+# NOTE: The commented-out "model:" lines under each provider are the latest
+# alternatives as of July 2026. To switch models, comment out the active
+# "model:" line and uncomment the one you want.
 language:
   summary_language: ur
-
 ocr:
   provider: google_cloud_vision
   language_hints: [ur, en]
   page_image_dpi: 300
   low_confidence_threshold: 0.8
-
 pipeline:
   # Used to clean up OCR text before the four independent summaries.
   correction_provider: gemini
-
   # Independent summaries are requested from these four services.
   # Change this list if you want to add/remove a summarisation service.
   summarisers: [chatgpt, claude, grok, deepseek]
-
   # Final consolidation of the four summaries.
   consolidator: gemini_consolidate
-
   # Set to 4 when all four summarisation services must succeed.
   # Lower this if you want the run to continue when a provider is temporarily down.
   min_summaries: 4
-
 providers:
   chatgpt:
     type: openai
     model: gpt-5.2
+    # --- Latest OpenAI alternatives (GPT-5.6 family, July 2026) ---
+    # The plain "gpt-5.6" alias also works and routes to Sol.
+    # All three support up to 128k output tokens if you want to raise
+    # max_output_tokens.
+    # model: gpt-5.6-sol    # flagship: complex reasoning & coding
+    # model: gpt-5.6-terra  # balanced intelligence vs cost
+    # model: gpt-5.6-luna   # fastest / cheapest, high-volume work
     api_key_env: OPENAI_API_KEY
     max_output_tokens: 4096
     prompt_cache:
       enabled: true
-
   gemini:
     type: gemini
     model: gemini-2.5-flash
+    # --- Latest Gemini alternatives (July 2026) ---
+    # model: gemini-3.5-flash       # latest GA Flash; strongest fast model
+    # model: gemini-3-flash         # previous Gen-3 Flash, still available
+    # model: gemini-3.1-flash-lite  # cheapest, high-volume option
     api_key_env: GEMINI_API_KEY
     max_output_tokens: 16384
     thinking_config:
       thinking_budget: 1024
-
   gemini_consolidate:
     type: gemini
     model: gemini-3.1-pro-preview
+    # gemini-3.1-pro-preview is still the latest Pro model (no stable
+    # Gemini 3.5 Pro yet as of July 2026). Alternative if you want a
+    # faster/cheaper consolidator:
+    # model: gemini-3.5-flash
     api_key_env: GEMINI_API_KEY
     max_output_tokens: 16384
     thinking_config:
       thinking_budget: 1024
-
   grok:
     type: grok
     model: grok-4.3
+    # --- Latest xAI alternative (July 2026) ---
+    # model: grok-4.5  # new flagship (released 8 Jul 2026), 500k context;
+    #                  # xAI's fastest and most intelligent model to date.
+    #                  # Cheaper "fast" variants also exist -- see
+    #                  # https://docs.x.ai/developers/models for current IDs.
     api_key_env: XAI_API_KEY
     base_url: https://api.x.ai/v1
     max_output_tokens: 4096
     prompt_cache:
       enabled: true
-
   deepseek:
     type: deepseek
     model: deepseek-v4-pro
+    # deepseek-v4-pro is already the latest DeepSeek flagship.
+    # Faster / cheaper alternative from the same V4 family:
+    # model: deepseek-v4-flash
+    # NOTE: do NOT switch to the legacy "deepseek-chat" or
+    # "deepseek-reasoner" names -- they are being retired on 24 Jul 2026.
     api_key_env: DEEPSEEK_API_KEY
     base_url: https://api.deepseek.com
     max_output_tokens: 4096
-
   claude:
     type: anthropic
     model: claude-opus-4-7
@@ -89,20 +106,16 @@ providers:
       display: omitted
     output_config:
       effort: high
-
 prompts:
   correction: prompts/correction.prompt.txt
   summarise: prompts/summarise.prompt.txt
   consolidate: prompts/consolidate.prompt.txt
-
 prompt_sets:
   directory: prompts/sets
-
 output:
   format: txt
   final_text_directory: 'C:\Users\Hamad.Mobeen\Downloads'
   destination: ./runs/
-
 runtime:
   concurrency: 4
   request_timeout_seconds: 120
