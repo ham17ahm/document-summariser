@@ -107,6 +107,52 @@ Common changes should be made in:
 - `providers.<name>.model` to change a provider model.
 - `runtime.concurrency`, `runtime.retries`, and `runtime.request_timeout_seconds` for operational tuning.
 
+### Optional Gemini 4 Argon and GPT-6 providers
+
+The repository config currently selects GPT-6 for summarisation and Gemini 4 Argon
+High for consolidation. The previous providers remain available, and packaged
+defaults are unchanged. Three additional provider IDs are available:
+
+| Provider ID | Model | Thinking / reasoning |
+| --- | --- | --- |
+| `gemini_argon_medium` | `gemini-4-argon` | medium |
+| `gemini_argon_high` | `gemini-4-argon` | high |
+| `chatgpt_gpt6` | `gpt-6-astra` | medium |
+
+To opt in, edit the existing `pipeline` block in `config/master_config.yaml`, for example:
+
+```yaml
+pipeline:
+  correction_provider: gemini_argon_medium
+  summarisers: [chatgpt_gpt6, claude, grok, deepseek]
+  consolidator: gemini_argon_high
+  min_summaries: 4
+```
+
+Then run `summarise input.pdf` or `python summarise_pdf.py input.pdf` as usual.
+Selections also apply to the whole batch and work with `--prompt-set`.
+Each stage can be selected independently. To use Argon for an independent
+summary, replace one entry in `summarisers` with either Argon ID. Keep four
+entries with the supplied consolidation prompts, which have four summary slots.
+Restore `gemini`, `[chatgpt, claude, grok, deepseek]`, and `gemini_consolidate`
+to return to the repository's original pipeline. Unselected entries make no API calls.
+
+The new entries reuse `GEMINI_API_KEY` and `OPENAI_API_KEY`. GPT-6 uses the text-only
+OpenAI adapter; use Gemini for correction with page images. GPT-6 reasoning can
+be changed with `providers.chatgpt_gpt6.reasoning_effort` (for example, `high`);
+do not add `temperature`. Argon uses `thinking_config.thinking_level`, without
+`thinking_budget`. Existing Gemini budget settings are preserved.
+
+Update dependencies in your active environment with `python -m pip install -e ".[dev]"`.
+Argon's high preset needs `google-genai>=2.30.1` for automatic continuation above
+the non-streaming token cap. The presets allow 32,768 tokens for medium and
+65,536 for high, including thinking tokens. High thinking can take longer and
+cost more; increase `runtime.request_timeout_seconds` if requests time out.
+Actual model access depends on your provider account.
+
+API references: [Gemini 4 Argon](https://ai.google.dev/gemini-api/docs/generate-content/latest-model)
+and [GPT-6](https://developers.openai.com/api/docs/guides/latest-model).
+
 Model requests separate stable instructions from variable document content so provider-side
 prompt caches can reuse the common prefix. OpenAI and xAI routing hints and Claude's
 five-minute cache are enabled through each provider's `prompt_cache` config. Gemini and

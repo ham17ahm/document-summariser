@@ -295,8 +295,17 @@ class OpenAICompatibleProvider(BaseCloudProvider):
         if self.config.temperature is not None:
             kwargs["temperature"] = self.config.temperature
         kwargs.update(self._cache_request_options(request))
+        if self.config.extra and "reasoning_effort" in self.config.extra:
+            kwargs["reasoning_effort"] = self.config.extra["reasoning_effort"]
 
         response = client.chat.completions.create(**kwargs)
+        if getattr(response.choices[0], "finish_reason", None) == "length":
+            raise ProviderError(
+                f"{self.id} hit max_output_tokens and returned a truncated response. "
+                "Increase max_output_tokens or lower reasoning_effort.",
+                details=self._error_details(finish_reason="length"),
+                retryable=False,
+            )
         content = response.choices[0].message.content
         usage = getattr(response, "usage", None)
         prompt_details = getattr(usage, "prompt_tokens_details", None)
@@ -413,7 +422,8 @@ class GeminiProvider(BaseCloudProvider):
         if any("MAX_TOKENS" in reason for reason in finish_reasons):
             raise ProviderError(
                 f"{self.id} hit max_output_tokens and returned a truncated response. "
-                "Increase max_output_tokens or lower thinking_config.thinking_budget.",
+                "Increase max_output_tokens or lower thinking_config.thinking_level "
+                "(thinking_config.thinking_budget for older models).",
                 details=self._error_details(
                     finish_reasons=finish_reasons,
                     attachment_count=len(attachments or []),

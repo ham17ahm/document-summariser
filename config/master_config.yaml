@@ -22,17 +22,48 @@ ocr:
   page_image_dpi: 300
   low_confidence_threshold: 0.8
 pipeline:
+  # Available provider IDs:
+  # - gemini_argon_medium / gemini_argon_high: correction, summary, or consolidation
+  # - chatgpt_gpt6: summary or consolidation (text only)
+  # Example: replace chatgpt in summarisers with chatgpt_gpt6, and set
+  # consolidator to gemini_argon_high. Keep four summarisers for the prompts.
   # Used to clean up OCR text before the four independent summaries.
   correction_provider: gemini
   # Independent summaries are requested from these four services.
   # Change this list if you want to add/remove a summarisation service.
-  summarisers: [chatgpt, claude, grok, deepseek]
+  summarisers: [chatgpt_gpt6, claude, grok, deepseek]
   # Final consolidation of the four summaries.
-  consolidator: gemini_consolidate
+  consolidator: gemini_argon_high
+  # To use the previous Gemini 3.1 Pro consolidator, replace the line above with:
+  # consolidator: gemini_consolidate
   # Set to 4 when all four summarisation services must succeed.
   # Lower this if you want the run to continue when a provider is temporarily down.
   min_summaries: 4
 providers:
+  gemini_argon_medium:
+    type: gemini
+    model: gemini-4-argon
+    api_key_env: GEMINI_API_KEY
+    max_output_tokens: 32768
+    thinking_config:
+      thinking_level: medium
+  gemini_argon_high:
+    type: gemini
+    model: gemini-4-argon
+    api_key_env: GEMINI_API_KEY
+    # Includes thinking tokens; requires google-genai>=2.30.1 for continuation.
+    max_output_tokens: 65536
+    thinking_config:
+      thinking_level: high
+  chatgpt_gpt6:
+    type: openai
+    model: gpt-6-astra
+    api_key_env: OPENAI_API_KEY
+    max_output_tokens: 32768
+    reasoning_effort: medium
+    # Do not set temperature for this reasoning model.
+    prompt_cache:
+      enabled: true
   chatgpt:
     type: openai
     model: gpt-5.2

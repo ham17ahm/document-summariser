@@ -10,8 +10,8 @@ def test_master_config_loads():
     assert config.summary_language == "ur"
     assert config.min_summaries == 4
     assert config.correction_provider == "gemini"
-    assert config.summarisers == ["chatgpt", "claude", "grok", "deepseek"]
-    assert config.consolidator == "gemini_consolidate"
+    assert config.summarisers == ["chatgpt_gpt6", "claude", "grok", "deepseek"]
+    assert config.consolidator == "gemini_argon_high"
     assert config.ocr["provider"] == "google_cloud_vision"
     assert config.providers["claude"].model == "claude-opus-4-7"
     assert config.providers["claude"].max_output_tokens == 64000
