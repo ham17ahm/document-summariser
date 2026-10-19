@@ -35,6 +35,7 @@ def test_master_config_loads():
     assert config.providers["grok"].extra == {"prompt_cache": {"enabled": True}}
     assert config.providers["deepseek"].model == "deepseek-v4-pro"
     assert config.providers["deepseek"].type == "deepseek"
+    assert config.providers["deepseek"].max_output_tokens == 32768
     assert config.prompt_sets_dir == Path("prompts/sets").resolve()
     assert config.selected_prompt_set is None
     assert config.output["format"] == "txt"
@@ -46,6 +47,7 @@ def test_packaged_default_config_loads():
     assert default_config_path().exists()
     assert config.source_path == default_config_path()
     assert config.summarisers == ["chatgpt", "claude", "grok", "deepseek"]
+    assert config.providers["deepseek"].max_output_tokens == 32768
     assert config.prompts["correction"].exists()
     assert config.prompt_sets_dir.exists()
     assert config.output["format"] == "txt"

@@ -157,7 +157,7 @@ def validate_pdf(path: Path) -> None:
 
 def _render_pdf_pages(pdf_path: Path, dpi: int) -> list[bytes]:
     try:
-        import fitz
+        import pymupdf
     except ModuleNotFoundError as exc:
         raise OcrError(
             "Install the 'PyMuPDF' package to render PDF pages for OCR.",
@@ -167,9 +167,9 @@ def _render_pdf_pages(pdf_path: Path, dpi: int) -> list[bytes]:
 
     images: list[bytes] = []
     zoom = dpi / 72
-    matrix = fitz.Matrix(zoom, zoom)
+    matrix = pymupdf.Matrix(zoom, zoom)
     try:
-        with fitz.open(pdf_path) as document:
+        with pymupdf.open(pdf_path) as document:
             for page in document:
                 pixmap = page.get_pixmap(matrix=matrix, alpha=False)
                 images.append(pixmap.tobytes("png"))

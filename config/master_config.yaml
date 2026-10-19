@@ -123,7 +123,8 @@ providers:
     # "deepseek-reasoner" names -- they are being retired on 24 Jul 2026.
     api_key_env: DEEPSEEK_API_KEY
     base_url: https://api.deepseek.com
-    max_output_tokens: 4096
+    # Shared budget for reasoning and the final summary; 4096 caused truncation.
+    max_output_tokens: 32768
   claude:
     type: anthropic
     model: claude-opus-4-7
