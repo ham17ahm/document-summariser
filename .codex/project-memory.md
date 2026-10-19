@@ -16,28 +16,24 @@ This repo is a Python CLI app for PDF OCR, Urdu summarisation, multi-provider co
 3. Render PDF pages to PNG with PyMuPDF and save them under `page_images/`.
 4. Run Google Cloud Vision document OCR.
 5. Correct OCR text using the configured correction provider. The correction stage passes the OCR text plus rendered page images to Gemini so it can compare OCR against the handwritten source.
-6. Summarise corrected text in parallel with ChatGPT, Gemini, Grok, and DeepSeek.
+6. Summarise corrected text in parallel with ChatGPT, Claude, Grok, and DeepSeek.
 7. Require at least `pipeline.min_summaries` successful summaries. The current master config requires all four.
-8. Consolidate provider summaries with Claude.
+8. Consolidate provider summaries with the configured Gemini consolidator.
 9. Write the final Urdu summary as plain UTF-8 text:
    - run artifact: `05_output.txt`
    - simple runner copy: `<input-pdf-stem>.txt` in `output.final_text_directory`
 10. Write intermediate artifacts and `manifest.json`, including `prompt_set`.
 
-## Current Default Providers
+## Current Master Configuration (verified 2026-10-19)
 
-- OCR: Google Cloud Vision
-- Correction: Gemini `gemini-2.5-pro`
-  - `max_output_tokens: 16384`
-  - `thinking_config.thinking_budget: 1024`
-- Summarisers:
-  - ChatGPT: `gpt-5.2`
-  - Gemini: `gemini-2.5-pro`
-  - Grok: `grok-4.3`
-  - DeepSeek: `deepseek-v4-pro`
-- Consolidator: Claude `claude-opus-4-7`
-  - adaptive thinking
-  - `output_config.effort: xhigh`
+Read `config/master_config.yaml` as the source of truth; packaged defaults differ.
+
+- OCR: Google Cloud Vision.
+- Correction: Gemini `gemini-2.5-flash`, `max_output_tokens: 16384`, `thinking_config.thinking_budget: 1024`.
+- Summarisers: `chatgpt_gpt6` (`gpt-6-astra`), Claude (`claude-opus-4-7`), Grok (`grok-4.3`), DeepSeek (`deepseek-v4-pro`).
+- DeepSeek: `max_output_tokens: 32768` in both master and packaged configs; the adapter sends this as `max_tokens`.
+- Consolidator: `gemini_argon_high` (`gemini-4-argon`), `max_output_tokens: 65536`, `thinking_config.thinking_level: high`.
+- `pipeline.min_summaries: 4` remains unchanged.
 
 ## Key Modules
 
@@ -95,7 +91,7 @@ summarise --help
 Expected current test result:
 
 ```text
-40 passed
+56 passed (verified 2026-10-19)
 ```
 
 On this Windows/sandbox setup, pytest may need to run outside the sandbox because pytest-created temp directories can receive ACLs that the sandbox cannot scan. Clean `pytest-tmp/` after test runs if it remains.
@@ -107,3 +103,12 @@ On this Windows/sandbox setup, pytest may need to run outside the sandbox becaus
 - Final output is now text only. DOCX rendering and the `python-docx` dependency were removed.
 - The default final text directory is `C:\Users\Hamad.Mobeen\Downloads`.
 - Tests use mock OCR and mock model providers, so they do not require API keys.
+
+## DeepSeek Truncation Fix (2026-10-19)
+
+- A summarisation failure with three successes was caused by DeepSeek returning `finish_reason: length` at the former 4096-token output limit. This indicates per-request truncation, not depleted API credits or account quota.
+- Raised DeepSeek's output budget to 32768 in master and packaged configs. The budget covers reasoning and the final answer; truncated responses remain rejected without retry. All four summaries are still required.
+- Replaced deprecated `fitz` imports and references with `pymupdf` in `ocr.py`. The import warning was separate from the DeepSeek failure.
+- Verification: 56 tests passed; compile check, CLI help, and diff checks passed. Mocked requests confirmed both configs send `max_tokens=32768` and reject truncation without retry. A synthetic two-page PDF rendered correctly at the requested DPI without the fitz warning.
+- Live paid API pipeline was not rerun; success on the original document with the increased budget remains unverified.
+- Removed generated pytest and bytecode cache artifacts after checks.
