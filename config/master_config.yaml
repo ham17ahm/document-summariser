@@ -35,7 +35,6 @@
 #
 # ==============================================================================
 
-
 # ==============================================================================
 #  STEP 1 - PIPELINE: which model does which job
 # ==============================================================================
@@ -52,13 +51,13 @@ pipeline:
   summarisers: [chatgpt_gpt6, claude, grok, deepseek]
 
   # Job 3: merge the four summaries into the final text.
+  # Alternative: gemini_carbon_medium (deeper reasoning, slower, more thinking).
   consolidator: gemini_argon_medium
 
   # How many of the summaries must succeed for the run to continue.
   # 4 = all must succeed. Lower it (e.g. 3) to keep going when one service
   # is temporarily down. Cannot be higher than the number of summarisers.
   min_summaries: 4
-
 
 # ==============================================================================
 #  STEP 2 - PROVIDERS: the models you can choose from
@@ -97,7 +96,6 @@ pipeline:
 #  The "other model IDs" notes below were last checked in July 2026; check the
 #  vendor's documentation for the current list.
 providers:
-
   # ---- Google Gemini ---------------------------------------------------------
 
   # Fast Gemini model.
@@ -141,6 +139,18 @@ providers:
     thinking_config:
       thinking_level: high
 
+  # Gemini 4 Carbon, medium thinking: deeper reasoning than Argon at the same
+  # per-token price, but it spends more thinking tokens and answers more slowly.
+  # Price per 1M tokens (same as Argon): $2 in / $10 out until 30 Nov 2026,
+  # then $4 in / $20 out. Thinking is billed as output.
+  gemini_carbon_medium:
+    vendor: google
+    model: gemini-4-carbon
+    # Includes thinking tokens. One response can hold at most 65536.
+    max_output_tokens: 32768
+    thinking_config:
+      thinking_level: medium
+
   # ---- OpenAI (ChatGPT) ------------------------------------------------------
 
   # GPT-6.
@@ -170,7 +180,7 @@ providers:
 
   claude:
     vendor: anthropic
-    model: claude-opus-4-7
+    model: claude-opus-5-5
     max_output_tokens: 64000
     prompt_cache:
       enabled: true
@@ -179,7 +189,7 @@ providers:
       type: adaptive
       display: omitted
     output_config:
-      effort: high
+      effort: medium
 
   # ---- xAI (Grok) ------------------------------------------------------------
 
@@ -204,7 +214,6 @@ providers:
     # were scheduled for retirement on 24 Jul 2026.
     # Shared budget for reasoning and the final summary; 4096 caused truncation.
     max_output_tokens: 32768
-
 
 # ==============================================================================
 #  STEP 3 - VENDORS: one block per AI company (rarely changes)
@@ -235,7 +244,6 @@ vendors:
     type: deepseek
     api_key_env: DEEPSEEK_API_KEY
     base_url: https://api.deepseek.com
-
 
 # ==============================================================================
 #  STEP 4 - EVERYTHING ELSE (usually left alone)
@@ -279,7 +287,7 @@ runtime:
   concurrency: 4
   # How long to wait for one answer before giving up. Raise this if
   # high-thinking models time out.
-  request_timeout_seconds: 120
+  request_timeout_seconds: 300
   # Attempts per request when a service is busy or briefly down (minimum 1).
   retries: 3
   # Wait before the first retry; it doubles after each further failure.

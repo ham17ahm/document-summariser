@@ -22,12 +22,12 @@ def test_master_config_loads():
     assert config.providers["grok"].api_key_env == "XAI_API_KEY"
     assert config.providers["deepseek"].api_key_env == "DEEPSEEK_API_KEY"
     assert config.providers["deepseek"].base_url == "https://api.deepseek.com"
-    assert config.providers["claude"].model == "claude-opus-4-7"
+    assert config.providers["claude"].model == "claude-opus-5-5"
     assert config.providers["claude"].max_output_tokens == 64000
     assert config.providers["claude"].extra == {
         "prompt_cache": {"enabled": True, "ttl": "5m"},
         "thinking": {"type": "adaptive", "display": "omitted"},
-        "output_config": {"effort": "high"},
+        "output_config": {"effort": "medium"},
     }
     assert config.providers["chatgpt"].model == "gpt-5.2"
     assert config.providers["chatgpt"].extra == {

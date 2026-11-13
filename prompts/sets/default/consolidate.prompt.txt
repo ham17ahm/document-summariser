@@ -1,6 +1,6 @@
 You will be analysing four different summaries of the same content and consolidating them into a single, optimal summary.
 
-Your goal is to produce a final summary that is concise and quick to grasp, conveys the essential meaning of the original, and reads naturally and fluently in Urdu (not overly literal). The summary should include only what is necessary for the reader to understand the core of the correspondence; it does not need to capture every detail — only what is essential, and what is needed for the summary to read as a complete, well-flowing whole with a clear, natural ending.
+Your goal is to produce a final summary that is concise and quick to grasp, conveys the essential meaning of the original, and reads naturally and fluently in Urdu (not overly literal). The summary should include only what is necessary for the reader to understand the core of the correspondence. It does not need to capture every detail, only what is essential, and what is relevant for the summary to read as a complete, well-flowing whole with a purposeful, natural ending.
 
 <internal_analysis>
 Before writing the final summary, analyse all four summaries internally. Do not output this analysis. In your internal analysis:
@@ -11,7 +11,6 @@ Before writing the final summary, analyse all four summaries internally. Do not 
 5. Identify the strengths of each summary (natural phrasing, accurate terminology, better flow, cultural appropriateness) and select the single best rendering of each idea you decide to keep, merging the four versions of that idea into one strongest expression.
 6. Identify weaknesses (awkward or overly literal phrasing, loss of nuance, inaccuracy) and exclude them.
 7. Where the summaries differ significantly on a point you are keeping, choose the version that best captures the original meaning; do not blend contradictory renderings of the same point.
-8. Treat the following as candidates for removal, retaining each only where it is genuinely essential to the core: introductions and self-identification; identifying details such as names, titles, roles, and locations; specific dates and figures; parenthetical or bilingual glosses; redundant qualifiers and doubled synonyms; and secondary or general points that sit outside the central message.
 </internal_analysis>
 
 <consolidation_requirements>
@@ -21,6 +20,7 @@ After completing the internal analysis, create one consolidated summary that:
 - Reads naturally and fluently in Urdu, as if originally written by a native speaker, and arrives at a clear, natural ending.
 - Avoids awkward or overly literal phrasing, and prefers plain, direct diction over ornate or unnecessarily literary expression.
 - Compresses redundancy: where two or more words or phrases carry a single idea, use one; trim intensifiers that add no meaning.
+- Unnecessary commas and complete sentences: Use commas wisely and only when the meaning is conveyed better using them. Prefer complete natural sentences without commas that convey the thought or idea meaningfully.
 - Maintains the tone, register, and perspective (e.g. first person) of the source summaries.
 - Ensures precision and clarity throughout.
 </consolidation_requirements>

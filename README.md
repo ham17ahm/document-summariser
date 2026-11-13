@@ -123,12 +123,13 @@ Anything written on the provider entry overrides the vendor's value. `vendor` is
 
 The repository config currently selects GPT-6 for summarisation and Gemini 4 Argon
 Medium for consolidation. The previous providers remain available, and packaged
-defaults are unchanged. Three additional provider IDs are available:
+defaults are unchanged. Four additional provider IDs are available:
 
 | Provider ID | Model | Thinking / reasoning |
 | --- | --- | --- |
 | `gemini_argon_medium` | `gemini-4-argon` | medium |
 | `gemini_argon_high` | `gemini-4-argon` | high |
+| `gemini_carbon_medium` | `gemini-4-carbon` | medium |
 | `chatgpt_gpt6` | `gpt-6-astra` | medium |
 
 To opt in, edit the existing `pipeline` block in `config/master_config.yaml`, for example:
@@ -154,6 +155,9 @@ OpenAI adapter; use Gemini for correction with page images. GPT-6 reasoning can
 be changed with `providers.chatgpt_gpt6.reasoning_effort` (for example, `high`);
 do not add `temperature`. Argon uses `thinking_config.thinking_level`, without
 `thinking_budget`. Existing Gemini budget settings are preserved.
+`gemini_carbon_medium` (Gemini 4 Carbon) exists only in `config/master_config.yaml`
+and is not selected by default; it uses the same `thinking_config.thinking_level`
+setting as Argon, costs the same per token, but thinks longer and responds more slowly.
 
 Update dependencies in your active environment with `python -m pip install -e ".[dev]"`.
 Argon's high preset needs `google-genai>=2.30.1` for automatic continuation above
