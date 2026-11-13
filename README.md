@@ -8,8 +8,8 @@ CLI pipeline for OCR, correction, multi-provider summarisation, consolidation, a
 2. Renders each PDF page to a PNG artifact.
 3. Sends each page image to Google Cloud Vision document OCR.
 4. Corrects OCR text with the configured correction provider.
-5. Sends the corrected text to ChatGPT, Gemini, Grok, and DeepSeek in parallel.
-6. Consolidates successful summaries with Claude into one final Urdu summary.
+5. Sends the corrected text to the configured summarisers in parallel.
+6. Consolidates successful summaries with the configured consolidator into one final Urdu summary.
 7. Writes a plain UTF-8 text file plus intermediate artifacts and `manifest.json`.
 
 ## Setup
@@ -92,25 +92,37 @@ Each run creates a timestamped directory containing:
 The canonical editable configuration lives in `config/master_config.yaml`.
 
 - OCR provider: Google Cloud Vision
-- Correction provider: Gemini
-- Summarisers: ChatGPT, Claude Opus 4.8, Grok, DeepSeek
-- Consolidator: Gemini 3.1 Pro Preview
+- Correction provider: `gemini` (Gemini 2.5 Flash)
+- Summarisers: `chatgpt_gpt6` (GPT-6), `claude` (Claude Opus 4.7), `grok` (Grok 4.3), `deepseek` (DeepSeek V4 Pro)
+- Consolidator: `gemini_argon_medium` (Gemini 4 Argon, medium thinking)
 - Output: plain UTF-8 Urdu text
 
 Provider credentials are read from environment variables named by each provider's `api_key_env`.
-The installed CLI also ships with the same default config, prompts, and output template, so `summarise` can run from outside the repository when no `--config` value is provided. When run from this repository, the CLI prefers `config/master_config.yaml`.
+The installed CLI also ships with a packaged default config (same layout, different model selection), prompts, and output template, so `summarise` can run from outside the repository when no `--config` value is provided. When run from this repository, the CLI prefers `config/master_config.yaml`.
 
-Common changes should be made in:
+The file is laid out in four steps, in the order you are likely to need them:
 
-- `pipeline.summarisers` to choose which services produce independent summaries.
-- `pipeline.consolidator` to choose the final consolidation service.
-- `providers.<name>.model` to change a provider model.
-- `runtime.concurrency`, `runtime.retries`, and `runtime.request_timeout_seconds` for operational tuning.
+1. `pipeline` chooses which model does each job (`correction_provider`, `summarisers`, `consolidator`).
+2. `providers` is the catalogue of models those names refer to. Change `providers.<name>.model` to upgrade a model, add an entry to add one, delete an entry to remove one.
+3. `vendors` holds the settings shared by all of one company's models (`type`, `api_key_env`, `base_url`).
+4. Language, OCR, prompts, output, and `runtime` (`concurrency`, `retries`, `request_timeout_seconds`).
+
+A provider entry names its vendor and inherits that vendor's settings, so a new model needs only a few lines:
+
+```yaml
+providers:
+  my_new_model:
+    vendor: openai
+    model: exact-model-id
+    max_output_tokens: 32768
+```
+
+Anything written on the provider entry overrides the vendor's value. `vendor` is optional: entries that spell out `type` and `api_key_env` themselves still load as before.
 
 ### Optional Gemini 4 Argon and GPT-6 providers
 
 The repository config currently selects GPT-6 for summarisation and Gemini 4 Argon
-High for consolidation. The previous providers remain available, and packaged
+Medium for consolidation. The previous providers remain available, and packaged
 defaults are unchanged. Three additional provider IDs are available:
 
 | Provider ID | Model | Thinking / reasoning |

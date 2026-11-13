@@ -11,8 +11,17 @@ def test_master_config_loads():
     assert config.min_summaries == 4
     assert config.correction_provider == "gemini"
     assert config.summarisers == ["chatgpt_gpt6", "claude", "grok", "deepseek"]
-    assert config.consolidator == "gemini_argon_high"
+    assert config.consolidator == "gemini_argon_medium"
     assert config.ocr["provider"] == "google_cloud_vision"
+    assert config.providers["claude"].type == "anthropic"
+    assert config.providers["claude"].api_key_env == "ANTHROPIC_API_KEY"
+    assert config.providers["gemini"].type == "gemini"
+    assert config.providers["gemini"].api_key_env == "GEMINI_API_KEY"
+    assert config.providers["chatgpt"].type == "openai"
+    assert config.providers["chatgpt"].api_key_env == "OPENAI_API_KEY"
+    assert config.providers["grok"].api_key_env == "XAI_API_KEY"
+    assert config.providers["deepseek"].api_key_env == "DEEPSEEK_API_KEY"
+    assert config.providers["deepseek"].base_url == "https://api.deepseek.com"
     assert config.providers["claude"].model == "claude-opus-4-7"
     assert config.providers["claude"].max_output_tokens == 64000
     assert config.providers["claude"].extra == {
@@ -82,6 +91,89 @@ prompts:
 
     with pytest.raises(ValueError, match="correction_provider"):
         load_config(config_path)
+
+
+def _write_vendor_config(tmp_path: Path, providers_yaml: str) -> Path:
+    config_path = tmp_path / "config.yaml"
+    correction = Path("prompts/correction.prompt.txt").resolve()
+    summarise = Path("prompts/summarise.prompt.txt").resolve()
+    consolidate = Path("prompts/consolidate.prompt.txt").resolve()
+    config_path.write_text(
+        f"""
+pipeline:
+  correction_provider: fast
+  summarisers: [fast]
+  consolidator: fast
+vendors:
+  acme:
+    type: mock
+    api_key_env: ACME_API_KEY
+    base_url: https://api.acme.test
+providers:
+{providers_yaml}
+prompts:
+  correction: {correction}
+  summarise: {summarise}
+  consolidate: {consolidate}
+""",
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def test_provider_inherits_vendor_settings(tmp_path):
+    config = load_config(
+        _write_vendor_config(
+            tmp_path,
+            """
+  fast:
+    vendor: acme
+    model: acme-fast
+    max_output_tokens: 100
+    reasoning_effort: low
+""",
+        )
+    )
+
+    provider = config.providers["fast"]
+    assert provider.type == "mock"
+    assert provider.model == "acme-fast"
+    assert provider.api_key_env == "ACME_API_KEY"
+    assert provider.base_url == "https://api.acme.test"
+    assert provider.max_output_tokens == 100
+    # "vendor" is a config shortcut, not a setting passed on to the provider.
+    assert provider.extra == {"reasoning_effort": "low"}
+
+
+def test_provider_settings_override_vendor_settings(tmp_path):
+    config = load_config(
+        _write_vendor_config(
+            tmp_path,
+            """
+  fast:
+    vendor: acme
+    model: acme-fast
+    api_key_env: OTHER_KEY
+""",
+        )
+    )
+
+    assert config.providers["fast"].api_key_env == "OTHER_KEY"
+    assert config.providers["fast"].base_url == "https://api.acme.test"
+
+
+def test_provider_with_unknown_vendor_is_rejected(tmp_path):
+    with pytest.raises(ValueError, match="unknown vendor 'nope'"):
+        load_config(
+            _write_vendor_config(
+                tmp_path,
+                """
+  fast:
+    vendor: nope
+    model: acme-fast
+""",
+            )
+        )
 
 
 def test_apply_prompt_set_overrides_summarise_and_consolidate_only(tmp_path):

@@ -27,9 +27,9 @@ The app flow is:
 4. Save page images under `page_images/`.
 5. Run Google Cloud Vision OCR.
 6. Correct OCR text using Gemini with rendered page images attached.
-7. Summarise corrected text in parallel with ChatGPT, Gemini, Grok, and DeepSeek.
+7. Summarise corrected text in parallel with the providers listed in `pipeline.summarisers`.
 8. Require at least `pipeline.min_summaries` successful summaries.
-9. Consolidate summaries with Claude.
+9. Consolidate summaries with the provider named in `pipeline.consolidator`.
 10. Write final Urdu output as plain UTF-8 text.
 11. Write intermediate artifacts and `manifest.json`, including `prompt_set`.
 
@@ -38,6 +38,17 @@ Canonical editable config:
 ```text
 config/master_config.yaml
 ```
+
+The file has four sections, in this order:
+
+1. `pipeline` selects which provider ID does each job.
+2. `providers` is the catalogue of provider IDs (one model plus its settings each).
+3. `vendors` holds the settings shared by all of one company's models (`type`, `api_key_env`, `base_url`).
+4. `language`, `ocr`, `prompts`, `prompt_sets`, `output`, `runtime`.
+
+A provider entry names a `vendor` and inherits that vendor's settings; values on the entry itself win. `vendor` is optional, so entries that spell out `type` and `api_key_env` still load. The merge happens in `config.py` (`_apply_vendor_defaults`); `ProviderConfig` and the provider registry are unaffected. An unknown vendor name raises `ConfigError` at load time.
+
+The packaged `src/document_summariser/defaults/config.yaml` uses the same layout but intentionally selects different models.
 
 Final output is text only. Do not reintroduce DOCX output or `python-docx` unless explicitly requested.
 
@@ -186,17 +197,19 @@ Add comments only for non-obvious design decisions, provider quirks, or operatio
 
 Current default providers are configured in `config/master_config.yaml`.
 
-Defaults:
+The pipeline in `config/master_config.yaml` currently selects (verified 2026-11-13; the file is the source of truth and changes often):
 
 ```text
 OCR:          Google Cloud Vision
-Correction:   Gemini gemini-3.1-pro-preview
-Summarisers:  ChatGPT gpt-5.2
-              Claude claude-opus-4-8
-              Grok grok-4.3
-              DeepSeek deepseek-v4-pro
-Consolidator: Gemini gemini-3.1-pro-preview
+Correction:   gemini              (gemini-2.5-flash)
+Summarisers:  chatgpt_gpt6        (gpt-6-astra)
+              claude              (claude-opus-4-7)
+              grok                (grok-4.3)
+              deepseek            (deepseek-v4-pro)
+Consolidator: gemini_argon_medium (gemini-4-argon, medium thinking)
 ```
+
+To add a model, add a `providers` entry with `vendor`, `model`, and `max_output_tokens`, then reference its ID in `pipeline`. Add a new `vendors` entry only for a new company, and a new registry factory only for a new API type.
 
 Important Gemini correction settings:
 
@@ -278,7 +291,7 @@ summarise --help
 Expected current test result:
 
 ```text
-40 passed
+59 passed
 ```
 
 On Windows/sandbox setups, pytest may need to run outside the sandbox because temp directories can receive ACLs the sandbox cannot scan.

@@ -80,12 +80,19 @@ def load_config(path: str | Path | None = None) -> AppConfig:
         provider_settings = raw.get("providers", {})
         if not isinstance(provider_settings, dict):
             raise ConfigError("Config key 'providers' must be a mapping.")
+        vendors = raw.get("vendors") or {}
+        if not isinstance(vendors, dict):
+            raise ConfigError(
+                "Config key 'vendors' must be a mapping.",
+                details={"config_file": str(source_path)},
+            )
         for provider_id, settings in provider_settings.items():
             if not isinstance(settings, dict):
                 raise ConfigError(
                     f"Provider config for {provider_id!r} must be a mapping.",
                     details={"config_file": str(source_path), "provider": provider_id},
                 )
+            settings = _apply_vendor_defaults(provider_id, settings, vendors, source_path)
             providers[provider_id] = _load_provider_config(provider_id, settings)
     except ConfigError:
         raise
@@ -250,6 +257,37 @@ def apply_prompt_set(config: AppConfig, prompt_set: str | None) -> AppConfig:
     updated = replace(config, prompts=prompts, selected_prompt_set=prompt_set)
     validate_config(updated)
     return updated
+
+
+def _apply_vendor_defaults(
+    provider_id: str,
+    settings: dict[str, Any],
+    vendors: dict[str, Any],
+    source_path: Path,
+) -> dict[str, Any]:
+    """Fill in shared vendor settings for a provider entry that names a ``vendor``.
+
+    Values written on the provider entry win over the vendor's. Entries without
+    a ``vendor`` key are returned unchanged, so fully spelled-out entries keep working.
+    """
+    if "vendor" not in settings:
+        return settings
+    vendor_name = settings["vendor"]
+    vendor_settings = vendors.get(vendor_name)
+    if not isinstance(vendor_settings, dict):
+        raise ConfigError(
+            f"Provider {provider_id!r} uses unknown vendor {vendor_name!r}. "
+            f"Vendors defined in the config: {', '.join(sorted(map(str, vendors))) or 'none'}.",
+            details={
+                "config_file": str(source_path),
+                "provider": provider_id,
+                "vendor": vendor_name,
+                "available_vendors": sorted(map(str, vendors)),
+            },
+        )
+    merged = {**vendor_settings, **settings}
+    del merged["vendor"]
+    return merged
 
 
 def _load_provider_config(provider_id: str, settings: dict[str, Any]) -> ProviderConfig:

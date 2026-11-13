@@ -13,62 +13,54 @@ pipeline:
   consolidator: gemini
   min_summaries: 4
 
+# Each provider names a vendor and inherits its type, api_key_env and base_url
+# from the vendors block below. See config/master_config.yaml for a commented guide.
 providers:
   gemini_argon_medium:
-    type: gemini
+    vendor: google
     model: gemini-4-argon
-    api_key_env: GEMINI_API_KEY
     max_output_tokens: 32768
     thinking_config:
       thinking_level: medium
   gemini_argon_high:
-    type: gemini
+    vendor: google
     model: gemini-4-argon
-    api_key_env: GEMINI_API_KEY
     max_output_tokens: 65536
     thinking_config:
       thinking_level: high
   chatgpt_gpt6:
-    type: openai
+    vendor: openai
     model: gpt-6-astra
-    api_key_env: OPENAI_API_KEY
     max_output_tokens: 32768
     reasoning_effort: medium
     prompt_cache:
       enabled: true
   chatgpt:
-    type: openai
+    vendor: openai
     model: gpt-5.2
-    api_key_env: OPENAI_API_KEY
     max_output_tokens: 4096
     prompt_cache:
       enabled: true
   gemini:
-    type: gemini
+    vendor: google
     model: gemini-3.1-pro-preview
-    api_key_env: GEMINI_API_KEY
     max_output_tokens: 16384
     thinking_config:
       thinking_budget: 1024
   grok:
-    type: grok
+    vendor: xai
     model: grok-4.3
-    api_key_env: XAI_API_KEY
-    base_url: https://api.x.ai/v1
     max_output_tokens: 4096
     prompt_cache:
       enabled: true
   deepseek:
-    type: deepseek
+    vendor: deepseek
     model: deepseek-v4-pro
-    api_key_env: DEEPSEEK_API_KEY
-    base_url: https://api.deepseek.com
     # Shared budget for reasoning and the final summary; 4096 caused truncation.
     max_output_tokens: 32768
   claude:
-    type: anthropic
+    vendor: anthropic
     model: claude-opus-4-8
-    api_key_env: ANTHROPIC_API_KEY
     max_output_tokens: 64000
     prompt_cache:
       enabled: true
@@ -78,6 +70,25 @@ providers:
       display: omitted
     output_config:
       effort: xhigh
+
+vendors:
+  google:
+    type: gemini
+    api_key_env: GEMINI_API_KEY
+  openai:
+    type: openai
+    api_key_env: OPENAI_API_KEY
+  anthropic:
+    type: anthropic
+    api_key_env: ANTHROPIC_API_KEY
+  xai:
+    type: grok
+    api_key_env: XAI_API_KEY
+    base_url: https://api.x.ai/v1
+  deepseek:
+    type: deepseek
+    api_key_env: DEEPSEEK_API_KEY
+    base_url: https://api.deepseek.com
 
 prompts:
   correction: prompts/correction.prompt.txt

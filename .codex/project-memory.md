@@ -24,15 +24,17 @@ This repo is a Python CLI app for PDF OCR, Urdu summarisation, multi-provider co
    - simple runner copy: `<input-pdf-stem>.txt` in `output.final_text_directory`
 10. Write intermediate artifacts and `manifest.json`, including `prompt_set`.
 
-## Current Master Configuration (verified 2026-10-19)
+## Current Master Configuration (verified 2026-11-13)
 
 Read `config/master_config.yaml` as the source of truth; packaged defaults differ.
+
+Layout (reorganised 2026-11-13): `pipeline` (which provider ID does each job), `providers` (catalogue), `vendors` (shared `type`, `api_key_env`, `base_url` per company), then everything else. Provider entries name a `vendor` and inherit its settings; entry values win; `vendor` is optional so fully spelled-out entries still load. Resolved provider settings are identical to before the reorganisation. The packaged default config uses the same layout.
 
 - OCR: Google Cloud Vision.
 - Correction: Gemini `gemini-2.5-flash`, `max_output_tokens: 16384`, `thinking_config.thinking_budget: 1024`.
 - Summarisers: `chatgpt_gpt6` (`gpt-6-astra`), Claude (`claude-opus-4-7`), Grok (`grok-4.3`), DeepSeek (`deepseek-v4-pro`).
 - DeepSeek: `max_output_tokens: 32768` in both master and packaged configs; the adapter sends this as `max_tokens`.
-- Consolidator: `gemini_argon_high` (`gemini-4-argon`), `max_output_tokens: 65536`, `thinking_config.thinking_level: high`.
+- Consolidator: `gemini_argon_medium` (`gemini-4-argon`), `max_output_tokens: 32768`, `thinking_config.thinking_level: medium`. `gemini_argon_high` remains available in the catalogue.
 - `pipeline.min_summaries: 4` remains unchanged.
 
 ## Key Modules
@@ -91,7 +93,7 @@ summarise --help
 Expected current test result:
 
 ```text
-56 passed (verified 2026-10-19)
+59 passed (verified 2026-11-13)
 ```
 
 On this Windows/sandbox setup, pytest may need to run outside the sandbox because pytest-created temp directories can receive ACLs that the sandbox cannot scan. Clean `pytest-tmp/` after test runs if it remains.
