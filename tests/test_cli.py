@@ -26,6 +26,16 @@ def test_parser_accepts_prompt_set_aliases():
     assert short_args.prompt_set == "pr2"
 
 
+def test_parser_accepts_model_aliases():
+    default_args = build_parser().parse_args(["a.pdf"])
+    long_args = build_parser().parse_args(["a.pdf", "--model", "argon"])
+    short_args = build_parser().parse_args(["a.pdf", "-m", "carbon"])
+
+    assert default_args.model is None
+    assert long_args.model == "argon"
+    assert short_args.model == "carbon"
+
+
 def test_final_text_rejected_for_multiple_pdfs(capsys):
     exit_code = main(["a.pdf", "b.pdf", "--final-text", "out.txt"])
 
@@ -35,9 +45,11 @@ def test_final_text_rejected_for_multiple_pdfs(capsys):
 
 def test_publish_final_supported_for_multiple_pdfs(tmp_path, monkeypatch, capsys):
     seen_prompt_sets = []
+    seen_models = []
 
-    def fake_run(pdf_path, config=None, output_dir=None, prompt_set=None):
+    def fake_run(pdf_path, config=None, output_dir=None, prompt_set=None, consolidator=None):
         seen_prompt_sets.append(prompt_set)
+        seen_models.append(consolidator)
         pdf = tmp_path / Path(pdf_path).name
         text_path = tmp_path / "runs" / f"{pdf.stem}.txt"
         text_path.parent.mkdir(parents=True, exist_ok=True)
@@ -52,10 +64,11 @@ def test_publish_final_supported_for_multiple_pdfs(tmp_path, monkeypatch, capsys
 
     monkeypatch.setattr("document_summariser.cli.run_document_summary", fake_run)
 
-    exit_code = main(["a.pdf", "b.pdf", "--prompt-set", "pr1"])
+    exit_code = main(["a.pdf", "b.pdf", "--prompt-set", "pr1", "-m", "carbon"])
 
     assert exit_code == 0
     assert seen_prompt_sets == ["pr1", "pr1"]
+    assert seen_models == ["carbon", "carbon"]
     assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "summary of a"
     assert (tmp_path / "b.txt").read_text(encoding="utf-8") == "summary of b"
     out = capsys.readouterr().out
@@ -65,7 +78,7 @@ def test_publish_final_supported_for_multiple_pdfs(tmp_path, monkeypatch, capsys
 def test_single_pdf_forwards_prompt_set(tmp_path, monkeypatch, capsys):
     seen = {}
 
-    def fake_run(pdf_path, config_path=None, output_dir=None, prompt_set=None):
+    def fake_run(pdf_path, config_path=None, output_dir=None, prompt_set=None, consolidator=None):
         text_path = tmp_path / "runs" / "summary.txt"
         text_path.parent.mkdir(parents=True, exist_ok=True)
         text_path.write_text("summary", encoding="utf-8")
@@ -75,6 +88,7 @@ def test_single_pdf_forwards_prompt_set(tmp_path, monkeypatch, capsys):
                 "config_path": config_path,
                 "output_dir": output_dir,
                 "prompt_set": prompt_set,
+                "consolidator": consolidator,
             }
         )
         return SimpleNamespace(
@@ -87,7 +101,7 @@ def test_single_pdf_forwards_prompt_set(tmp_path, monkeypatch, capsys):
 
     monkeypatch.setattr("document_summariser.cli.run_document_summary", fake_run)
 
-    exit_code = main(["a.pdf", "--config", "config.yaml", "--out", "runs", "-p", "pr2"])
+    exit_code = main(["a.pdf", "--config", "config.yaml", "--out", "runs", "-p", "pr2", "--model", "argon"])
 
     assert exit_code == 0
     assert seen == {
@@ -95,6 +109,7 @@ def test_single_pdf_forwards_prompt_set(tmp_path, monkeypatch, capsys):
         "config_path": "config.yaml",
         "output_dir": "runs",
         "prompt_set": "pr2",
+        "consolidator": "argon",
     }
     assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "summary"
     out = capsys.readouterr().out

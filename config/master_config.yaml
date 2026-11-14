@@ -52,12 +52,27 @@ pipeline:
 
   # Job 3: merge the four summaries into the final text.
   # Alternative: gemini_carbon_medium (deeper reasoning, slower, more thinking).
+  # For a single run, override this with -m (see model_aliases below).
   consolidator: gemini_argon_medium
 
   # How many of the summaries must succeed for the run to continue.
   # 4 = all must succeed. Lower it (e.g. 3) to keep going when one service
   # is temporarily down. Cannot be higher than the number of summarisers.
   min_summaries: 4
+
+# Short names for choosing the Job 3 (consolidation) model on the command line,
+# without editing this file:
+#
+#     summarise letter.pdf -m carbon
+#     summarise letter.pdf -p report -m argon
+#
+# Left side: the short name you type. Right side: an entry from STEP 2.
+# Add, rename or remove lines freely. Without -m, "consolidator" above is used.
+# A full STEP 2 name also works: -m gemini_argon_high
+model_aliases:
+  argon: gemini_argon_medium
+  argonhigh: gemini_argon_high
+  carbon: gemini_carbon_medium
 
 # ==============================================================================
 #  STEP 2 - PROVIDERS: the models you can choose from

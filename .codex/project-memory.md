@@ -11,18 +11,18 @@ This repo is a Python CLI app for PDF OCR, Urdu summarisation, multi-provider co
 
 ## Current App Flow
 
-1. Load config and optionally apply a CLI-selected prompt set with `-p/--prompt-set`.
+1. Load config and optionally apply a CLI-selected prompt set with `-p/--prompt-set` and a CLI-selected consolidation model with `-m/--model`.
 2. Validate input PDF.
 3. Render PDF pages to PNG with PyMuPDF and save them under `page_images/`.
 4. Run Google Cloud Vision document OCR.
 5. Correct OCR text using the configured correction provider. The correction stage passes the OCR text plus rendered page images to Gemini so it can compare OCR against the handwritten source.
 6. Summarise corrected text in parallel with ChatGPT, Claude, Grok, and DeepSeek.
 7. Require at least `pipeline.min_summaries` successful summaries. The current master config requires all four.
-8. Consolidate provider summaries with the configured Gemini consolidator.
+8. Consolidate provider summaries with the selected provider (the master config defaults to Gemini).
 9. Write the final Urdu summary as plain UTF-8 text:
    - run artifact: `05_output.txt`
    - simple runner copy: `<input-pdf-stem>.txt` in `output.final_text_directory`
-10. Write intermediate artifacts and `manifest.json`, including `prompt_set`.
+10. Write intermediate artifacts and `manifest.json`, including `prompt_set` and `consolidator`.
 
 ## Current Master Configuration (verified 2026-11-13)
 
@@ -36,6 +36,17 @@ Layout (reorganised 2026-11-13): `pipeline` (which provider ID does each job), `
 - DeepSeek: `max_output_tokens: 32768` in both master and packaged configs; the adapter sends this as `max_tokens`.
 - Consolidator: `gemini_argon_medium` (`gemini-4-argon`), `max_output_tokens: 32768`, `thinking_config.thinking_level: medium`. `gemini_argon_high` remains available in the catalogue.
 - `pipeline.min_summaries: 4` remains unchanged.
+
+## Consolidation Model Selection (verified 2026-11-14)
+
+- `-m/--model` accepts a `model_aliases` short name or a full provider ID and overrides only consolidation for one run or the entire batch. It works with `-p/--prompt-set`; correction, summarisers, and prompt selection are otherwise unchanged.
+- Master aliases: `argon` -> `gemini_argon_medium`, `argonhigh` -> `gemini_argon_high`, `carbon` -> `gemini_carbon_medium`. Packaged defaults include the two Argon aliases only.
+- Without `-m`, the configured consolidator is preserved. Omitting `model_aliases` remains supported; an explicitly supplied value must be a mapping (including rejection of null).
+- Alias names and targets must be nonempty strings without surrounding whitespace. Targets must exist. An alias cannot redirect an existing provider ID; an alias pointing to its own provider ID is allowed.
+- Empty or whitespace-only model input is rejected. Invalid configuration, unknown model names, and missing selected-provider API keys fail before OCR or artifact creation.
+- `application.py` applies the override before preflight and records the resolved provider ID in `manifest.json` as `consolidator`.
+- Regression tests verify actual mock-provider output, saved manifests, unchanged earlier-stage artifacts, early failures, and single/batch CLI runs with prompt sets. Redundant cases were removed: the suite now has 84 passing tests, down from 104, while retaining the essential behavior checks.
+- Compile, CLI help, and whitespace checks passed. The one test warning is an existing Google GenAI SDK `_UnionGenericAlias` deprecation warning. No paid API pipeline was run; generated `pytest-tmp` and `__pycache__` directories were removed.
 
 ## Key Modules
 
@@ -93,7 +104,7 @@ summarise --help
 Expected current test result:
 
 ```text
-59 passed (verified 2026-11-13)
+84 passed, 1 warning (verified 2026-11-14)
 ```
 
 On this Windows/sandbox setup, pytest may need to run outside the sandbox because pytest-created temp directories can receive ACLs that the sandbox cannot scan. Clean `pytest-tmp/` after test runs if it remains.

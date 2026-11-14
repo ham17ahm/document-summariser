@@ -1,7 +1,16 @@
 import pytest
 from pathlib import Path
 
-from document_summariser.config import apply_prompt_set, default_config_path, load_config, preferred_config_path
+import yaml
+
+from document_summariser.config import (
+    apply_consolidator,
+    apply_prompt_set,
+    default_config_path,
+    load_config,
+    preferred_config_path,
+)
+from document_summariser.errors import ConfigError
 
 
 def test_master_config_loads():
@@ -208,6 +217,98 @@ def test_apply_prompt_set_rejects_path_names(tmp_path):
 
     with pytest.raises(ValueError, match="single folder name"):
         apply_prompt_set(config, "../pr1")
+
+
+def test_master_config_model_aliases_resolve():
+    config = load_config("config/master_config.yaml")
+
+    assert apply_consolidator(config, None) is config
+    assert apply_consolidator(config, "argon").consolidator == "gemini_argon_medium"
+    assert apply_consolidator(config, "carbon").consolidator == "gemini_carbon_medium"
+    # A full provider name works without an alias.
+    assert apply_consolidator(config, "gemini_argon_high").consolidator == "gemini_argon_high"
+
+
+def test_apply_consolidator_changes_only_the_consolidator(tmp_path):
+    config = load_config(_write_alias_config(tmp_path, "quick: other"))
+
+    updated = apply_consolidator(config, "quick")
+
+    assert updated.consolidator == "other"
+    assert updated.correction_provider == config.correction_provider
+    assert updated.summarisers == config.summarisers
+    assert updated.prompts == config.prompts
+
+
+def test_config_without_model_aliases_still_loads(tmp_path):
+    config = load_config(_write_prompt_set_config(tmp_path))
+
+    assert config.model_aliases == {}
+    assert apply_consolidator(config, "claude").consolidator == "claude"
+
+
+@pytest.mark.parametrize("aliases", [[], "other", None])
+def test_model_aliases_require_a_mapping(tmp_path, aliases):
+    path = _write_alias_config(tmp_path, "quick: other")
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    raw["model_aliases"] = aliases
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    with pytest.raises(ConfigError, match="must be a mapping"):
+        load_config(path)
+
+
+@pytest.mark.parametrize(
+    "alias_line",
+    [
+        '"": other', '" quick ": other', "123: other",
+        'quick: "   "', 'quick: " other "', "quick: 123", "quick: [other]",
+    ],
+)
+def test_model_alias_names_and_targets_require_nonempty_strings(tmp_path, alias_line):
+    with pytest.raises(ConfigError, match="must be nonempty strings"):
+        load_config(_write_alias_config(tmp_path, alias_line))
+
+
+def test_model_alias_cannot_redirect_a_provider_id(tmp_path):
+    with pytest.raises(ConfigError, match="conflicts with an existing provider ID"):
+        load_config(_write_alias_config(tmp_path, "claude: other"))
+
+
+def test_model_alias_can_repeat_its_own_provider_id(tmp_path):
+    config = load_config(_write_alias_config(tmp_path, "other: other"))
+
+    assert apply_consolidator(config, "other").consolidator == "other"
+
+
+def _write_alias_config(tmp_path: Path, alias_line: str) -> Path:
+    config_path = tmp_path / "config.yaml"
+    correction = Path("prompts/correction.prompt.txt").resolve()
+    summarise = Path("prompts/summarise.prompt.txt").resolve()
+    consolidate = Path("prompts/consolidate.prompt.txt").resolve()
+    config_path.write_text(
+        f"""
+pipeline:
+  correction_provider: claude
+  summarisers: [claude]
+  consolidator: claude
+model_aliases:
+  {alias_line}
+providers:
+  claude:
+    type: mock
+    model: claude-test
+  other:
+    type: mock
+    model: other-test
+prompts:
+  correction: {correction}
+  summarise: {summarise}
+  consolidate: {consolidate}
+""",
+        encoding="utf-8",
+    )
+    return config_path
 
 
 def _write_prompt_set_config(tmp_path: Path) -> Path:

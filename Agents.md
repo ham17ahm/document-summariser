@@ -21,7 +21,7 @@ Priorities:
 
 The app flow is:
 
-1. Load config and optionally apply a CLI-selected prompt set with `-p/--prompt-set`.
+1. Load config and optionally apply a CLI-selected prompt set with `-p/--prompt-set` and a CLI-selected consolidation model with `-m/--model`.
 2. Validate input PDF.
 3. Render PDF pages to PNG using PyMuPDF.
 4. Save page images under `page_images/`.
@@ -31,7 +31,7 @@ The app flow is:
 8. Require at least `pipeline.min_summaries` successful summaries.
 9. Consolidate summaries with the provider named in `pipeline.consolidator`.
 10. Write final Urdu output as plain UTF-8 text.
-11. Write intermediate artifacts and `manifest.json`, including `prompt_set`.
+11. Write intermediate artifacts and `manifest.json`, including `prompt_set` and `consolidator`.
 
 Canonical editable config:
 
@@ -45,6 +45,8 @@ The file has four sections, in this order:
 2. `providers` is the catalogue of provider IDs (one model plus its settings each).
 3. `vendors` holds the settings shared by all of one company's models (`type`, `api_key_env`, `base_url`).
 4. `language`, `ocr`, `prompts`, `prompt_sets`, `output`, `runtime`.
+
+`model_aliases` (placed right after `pipeline`) maps short CLI names to provider IDs, e.g. `argon: gemini_argon_medium`. `summarise input.pdf -m <alias-or-provider-id>` overrides `pipeline.consolidator` for that run only (whole batch); the other stages are unaffected. Resolution lives in `config.py` (`resolve_model_name`, `apply_consolidator`) and runs before the preflight key check. An alias pointing at a missing provider raises `ConfigError` at load time; an unknown `-m` name raises `ConfigError` before OCR. `resolve_model_name` is stage-agnostic, so a flag for another stage can reuse it.
 
 A provider entry names a `vendor` and inherits that vendor's settings; values on the entry itself win. `vendor` is optional, so entries that spell out `type` and `api_key_env` still load. The merge happens in `config.py` (`_apply_vendor_defaults`); `ProviderConfig` and the provider registry are unaffected. An unknown vendor name raises `ConfigError` at load time.
 
@@ -291,7 +293,7 @@ summarise --help
 Expected current test result:
 
 ```text
-59 passed
+84 passed
 ```
 
 On Windows/sandbox setups, pytest may need to run outside the sandbox because temp directories can receive ACLs the sandbox cannot scan.

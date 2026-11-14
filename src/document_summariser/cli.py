@@ -29,6 +29,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Prompt set folder under prompt_sets.directory to use for summarise and consolidate prompts.",
     )
     parser.add_argument(
+        "-m",
+        "--model",
+        default=None,
+        help=(
+            "Model for the consolidation step: a short name from model_aliases in the "
+            "config (e.g. argon, carbon) or a provider name. Defaults to pipeline.consolidator."
+        ),
+    )
+    parser.add_argument(
         "--final-text",
         default=None,
         help="Optional path for a copy of the final TXT output. Single PDF only.",
@@ -80,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
                 config_path=args.config,
                 output_dir=args.out,
                 prompt_set=args.prompt_set,
+                consolidator=args.model,
             )
             if args.final_text:
                 final_text = copy_final_text(result.output_text_path, Path(args.final_text))
@@ -104,6 +114,7 @@ def main(argv: list[str] | None = None) -> int:
         args.parallel,
         args.publish_final,
         args.prompt_set,
+        args.model,
     )
 
 
@@ -115,6 +126,7 @@ def _run_concurrent(
     parallel: int,
     publish_final: bool = False,
     prompt_set: str | None = None,
+    consolidator: str | None = None,
 ) -> int:
     any_failed = False
     # Each pipeline already fans out its own summariser threads; running every
@@ -122,7 +134,7 @@ def _run_concurrent(
     max_workers = max(1, min(parallel, len(pdf_paths)))
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(run_document_summary, path, config, out, prompt_set): path
+            executor.submit(run_document_summary, path, config, out, prompt_set, consolidator): path
             for path in pdf_paths
         }
         for future in as_completed(futures):

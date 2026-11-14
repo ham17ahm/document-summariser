@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -38,6 +38,8 @@ class AppConfig:
     selected_prompt_set: str | None
     output: dict[str, Any]
     runtime: dict[str, Any]
+    # Short CLI names for provider IDs, e.g. {"argon": "gemini_argon_medium"}.
+    model_aliases: dict[str, str] = field(default_factory=dict)
 
 
 def default_config_path() -> Path:
@@ -117,6 +119,12 @@ def load_config(path: str | Path | None = None) -> AppConfig:
             details={"config_file": str(source_path)},
         )
     output = raw.get("output", {})
+    model_aliases = raw.get("model_aliases", {})
+    if not isinstance(model_aliases, dict):
+        raise ConfigError(
+            "Config key 'model_aliases' must be a mapping of short name to provider name.",
+            details={"config_file": str(source_path)},
+        )
 
     try:
         config = AppConfig(
@@ -134,6 +142,7 @@ def load_config(path: str | Path | None = None) -> AppConfig:
             selected_prompt_set=None,
             output=output,
             runtime=raw.get("runtime", {}),
+            model_aliases=dict(model_aliases),
         )
         validate_config(config)
     except ConfigError:
@@ -163,6 +172,29 @@ def validate_config(config: AppConfig) -> None:
         raise ConfigError(
             f"Missing provider config for consolidator: {config.consolidator}",
             details={"config_file": str(config.source_path), "consolidator": config.consolidator},
+        )
+    for alias, target in config.model_aliases.items():
+        if any(
+            not isinstance(value, str) or not value.strip() or value != value.strip()
+            for value in (alias, target)
+        ):
+            raise ConfigError(
+                "model_aliases names and targets must be nonempty strings without surrounding whitespace.",
+                details={"config_file": str(config.source_path)},
+            )
+        if alias in config.providers and alias != target:
+            raise ConfigError(
+                f"Model alias {alias!r} conflicts with an existing provider ID.",
+                details={"config_file": str(config.source_path), "alias": alias, "target": target},
+            )
+    broken_aliases = {
+        alias: target for alias, target in config.model_aliases.items() if target not in config.providers
+    }
+    if broken_aliases:
+        raise ConfigError(
+            "model_aliases point to providers that do not exist: "
+            + ", ".join(f"{alias} -> {target}" for alias, target in broken_aliases.items()),
+            details={"config_file": str(config.source_path), "model_aliases": broken_aliases},
         )
     if config.min_summaries < 1:
         raise ConfigError(
@@ -255,6 +287,45 @@ def apply_prompt_set(config: AppConfig, prompt_set: str | None) -> AppConfig:
     prompts = dict(config.prompts)
     prompts.update(required)
     updated = replace(config, prompts=prompts, selected_prompt_set=prompt_set)
+    validate_config(updated)
+    return updated
+
+
+def resolve_model_name(config: AppConfig, name: str) -> str:
+    """Turn a CLI model name into a provider ID.
+
+    Accepts a short name from ``model_aliases`` or a provider ID from
+    ``providers``. Aliases cannot redirect an existing provider ID.
+    """
+    name = name.strip()
+    if not name:
+        raise ConfigError(
+            "Model name cannot be empty.",
+            details={"config_file": str(config.source_path)},
+        )
+    if name in config.model_aliases:
+        return config.model_aliases[name]
+    if name in config.providers:
+        return name
+    aliases = sorted(config.model_aliases)
+    raise ConfigError(
+        f"Unknown model {name!r}. "
+        f"Short names: {', '.join(aliases) or 'none defined'}. "
+        f"Provider names: {', '.join(sorted(config.providers))}.",
+        details={
+            "config_file": str(config.source_path),
+            "model": name,
+            "model_aliases": aliases,
+            "providers": sorted(config.providers),
+        },
+    )
+
+
+def apply_consolidator(config: AppConfig, model: str | None) -> AppConfig:
+    """Override ``pipeline.consolidator`` with a CLI-selected model, if given."""
+    if model is None:
+        return config
+    updated = replace(config, consolidator=resolve_model_name(config, model))
     validate_config(updated)
     return updated
 

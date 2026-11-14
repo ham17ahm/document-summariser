@@ -77,6 +77,15 @@ Select a prompt set for one PDF or a batch:
 .venv/bin/summarise a.pdf b.pdf -p default
 ```
 
+Select the consolidation model for one run, without editing the config:
+
+```bash
+.venv/bin/summarise path/to/input.pdf -m carbon
+.venv/bin/summarise a.pdf b.pdf -p default --model argon
+```
+
+The short names (`argon`, `argonhigh`, `carbon`) are defined under `model_aliases` in `config/master_config.yaml`; add or rename lines there as models change. A full provider name such as `-m gemini_argon_high` also works. Without `-m`, `pipeline.consolidator` is used. Only the consolidation step is affected.
+
 Each run creates a timestamped directory containing:
 
 - `01_ocr.json`

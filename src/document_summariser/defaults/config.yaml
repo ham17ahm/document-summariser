@@ -13,6 +13,11 @@ pipeline:
   consolidator: gemini
   min_summaries: 4
 
+# Short names for `summarise input.pdf -m <name>` (consolidation model).
+model_aliases:
+  argon: gemini_argon_medium
+  argonhigh: gemini_argon_high
+
 # Each provider names a vendor and inherits its type, api_key_env and base_url
 # from the vendors block below. See config/master_config.yaml for a commented guide.
 providers:
