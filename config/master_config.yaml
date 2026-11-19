@@ -51,7 +51,8 @@ pipeline:
   summarisers: [chatgpt_gpt6, claude, grok, deepseek]
 
   # Job 3: merge the four summaries into the final text.
-  # Alternative: gemini_carbon_medium (deeper reasoning, slower, more thinking).
+  # Alternatives: gemini_carbon_medium (deeper reasoning, slower, more thinking),
+  # gemini_neon_medium / gemini_neon_high (newer, faster than Carbon).
   # For a single run, override this with -m (see model_aliases below).
   consolidator: gemini_argon_medium
 
@@ -65,6 +66,7 @@ pipeline:
 #
 #     summarise letter.pdf -m carbon
 #     summarise letter.pdf -p report -m argon
+#     summarise letter.pdf -m neon
 #
 # Left side: the short name you type. Right side: an entry from STEP 2.
 # Add, rename or remove lines freely. Without -m, "consolidator" above is used.
@@ -73,6 +75,8 @@ model_aliases:
   argon: gemini_argon_medium
   argonhigh: gemini_argon_high
   carbon: gemini_carbon_medium
+  neon: gemini_neon_medium
+  neonhigh: gemini_neon_high
 
 # ==============================================================================
 #  STEP 2 - PROVIDERS: the models you can choose from
@@ -99,7 +103,8 @@ model_aliases:
 #    temperature        optional; leave it out for reasoning models
 #
 #  Extra settings that only some vendors understand:
-#    google     thinking_config:  thinking_level: low|medium|high  (Gemini 4)
+#    google     thinking_config:  thinking_level: low|medium|high  (Gemini 4;
+#                                                 Neon also has xhigh)
 #                                 thinking_budget: <tokens>        (older Gemini)
 #    openai     reasoning_effort: low|medium|high
 #    anthropic  thinking: / output_config:  (see the "claude" entry)
@@ -165,6 +170,28 @@ providers:
     max_output_tokens: 32768
     thinking_config:
       thinking_level: medium
+
+  # Gemini 4 Neon (released 18 Nov 2026), medium thinking. Reported to be faster
+  # and cheaper per task than Carbon at similar quality. Neon's own default
+  # level is high, so keep thinking_level set explicitly.
+  # Price per 1M tokens: $3 in / $15 out (no scheduled change), so dearer than
+  # Argon/Carbon until 30 Nov 2026 and cheaper from 1 Dec. Thinking is billed
+  # as output. Does not accept thinking_budget.
+  gemini_neon_medium:
+    vendor: google
+    model: gemini-4-neon
+    max_output_tokens: 32768
+    thinking_config:
+      thinking_level: medium
+
+  # Gemini 4 Neon, high thinking: slower and costlier, more thorough.
+  gemini_neon_high:
+    vendor: google
+    model: gemini-4-neon
+    # Includes thinking tokens. One response can hold at most 65536.
+    max_output_tokens: 65536
+    thinking_config:
+      thinking_level: high
 
   # ---- OpenAI (ChatGPT) ------------------------------------------------------
 

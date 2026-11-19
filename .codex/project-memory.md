@@ -40,7 +40,7 @@ Layout (reorganised 2026-11-13): `pipeline` (which provider ID does each job), `
 ## Consolidation Model Selection (verified 2026-11-14)
 
 - `-m/--model` accepts a `model_aliases` short name or a full provider ID and overrides only consolidation for one run or the entire batch. It works with `-p/--prompt-set`; correction, summarisers, and prompt selection are otherwise unchanged.
-- Master aliases: `argon` -> `gemini_argon_medium`, `argonhigh` -> `gemini_argon_high`, `carbon` -> `gemini_carbon_medium`. Packaged defaults include the two Argon aliases only.
+- Master aliases: `argon` -> `gemini_argon_medium`, `argonhigh` -> `gemini_argon_high`, `carbon` -> `gemini_carbon_medium`, `neon` -> `gemini_neon_medium`, `neonhigh` -> `gemini_neon_high`. Packaged defaults include the two Argon aliases only.
 - Without `-m`, the configured consolidator is preserved. Omitting `model_aliases` remains supported; an explicitly supplied value must be a mapping (including rejection of null).
 - Alias names and targets must be nonempty strings without surrounding whitespace. Targets must exist. An alias cannot redirect an existing provider ID; an alias pointing to its own provider ID is allowed.
 - Empty or whitespace-only model input is rejected. Invalid configuration, unknown model names, and missing selected-provider API keys fail before OCR or artifact creation.
@@ -104,7 +104,7 @@ summarise --help
 Expected current test result:
 
 ```text
-84 passed, 1 warning (verified 2026-11-14)
+86 passed, 1 warning (verified 2026-11-19)
 ```
 
 On this Windows/sandbox setup, pytest may need to run outside the sandbox because pytest-created temp directories can receive ACLs that the sandbox cannot scan. Clean `pytest-tmp/` after test runs if it remains.

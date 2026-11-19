@@ -115,6 +115,19 @@ def test_new_models_through_full_pipeline(tmp_path, monkeypatch, fake_apis, leve
     assert "prompt_cache_retention" not in request
 
 
+@pytest.mark.parametrize("level, max_tokens", [("medium", 32768), ("high", 65536)])
+def test_neon_entries_send_thinking_level(fake_apis, level, max_tokens):
+    provider = build_provider_registry(load_config("config/master_config.yaml"))[f"gemini_neon_{level}"]
+    provider.generate(PromptRequest(system="Consolidate", user="Test", cache_key="test"))
+    call = fake_apis["gemini"][0]
+    assert call["model"] == "gemini-4-neon"
+    assert call["config"].thinking_config.thinking_level.value.lower() == level
+    # Neon rejects thinking_budget with HTTP 400.
+    assert call["config"].thinking_config.thinking_budget is None
+    assert call["config"].max_output_tokens == max_tokens
+    assert call["config"].temperature is None
+
+
 def test_gpt6_rejects_truncation_without_retry(fake_apis):
     fake_apis["finish_reason"] = "length"
     provider = build_provider_registry(load_config("config/master_config.yaml"))["chatgpt_gpt6"]

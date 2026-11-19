@@ -225,6 +225,8 @@ def test_master_config_model_aliases_resolve():
     assert apply_consolidator(config, None) is config
     assert apply_consolidator(config, "argon").consolidator == "gemini_argon_medium"
     assert apply_consolidator(config, "carbon").consolidator == "gemini_carbon_medium"
+    assert apply_consolidator(config, "neon").consolidator == "gemini_neon_medium"
+    assert apply_consolidator(config, "neonhigh").consolidator == "gemini_neon_high"
     # A full provider name works without an alias.
     assert apply_consolidator(config, "gemini_argon_high").consolidator == "gemini_argon_high"
 

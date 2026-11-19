@@ -84,7 +84,7 @@ Select the consolidation model for one run, without editing the config:
 .venv/bin/summarise a.pdf b.pdf -p default --model argon
 ```
 
-The short names (`argon`, `argonhigh`, `carbon`) are defined under `model_aliases` in `config/master_config.yaml`; add or rename lines there as models change. A full provider name such as `-m gemini_argon_high` also works. Without `-m`, `pipeline.consolidator` is used. Only the consolidation step is affected.
+The short names (`argon`, `argonhigh`, `carbon`, `neon`, `neonhigh`) are defined under `model_aliases` in `config/master_config.yaml`; add or rename lines there as models change. A full provider name such as `-m gemini_argon_high` also works. Without `-m`, `pipeline.consolidator` is used. Only the consolidation step is affected.
 
 Each run creates a timestamped directory containing:
 
@@ -139,6 +139,8 @@ defaults are unchanged. Four additional provider IDs are available:
 | `gemini_argon_medium` | `gemini-4-argon` | medium |
 | `gemini_argon_high` | `gemini-4-argon` | high |
 | `gemini_carbon_medium` | `gemini-4-carbon` | medium |
+| `gemini_neon_medium` | `gemini-4-neon` | medium |
+| `gemini_neon_high` | `gemini-4-neon` | high |
 | `chatgpt_gpt6` | `gpt-6-astra` | medium |
 
 To opt in, edit the existing `pipeline` block in `config/master_config.yaml`, for example:
@@ -167,6 +169,9 @@ do not add `temperature`. Argon uses `thinking_config.thinking_level`, without
 `gemini_carbon_medium` (Gemini 4 Carbon) exists only in `config/master_config.yaml`
 and is not selected by default; it uses the same `thinking_config.thinking_level`
 setting as Argon, costs the same per token, but thinks longer and responds more slowly.
+`gemini_neon_medium` and `gemini_neon_high` (Gemini 4 Neon) also exist only in the master config and are
+not selected by default; use them per run with `-m neon` or `-m neonhigh`. Neon costs
+`$3` in / `$15` out per 1M tokens and rejects `thinking_budget`; keep `thinking_level` set.
 
 Update dependencies in your active environment with `python -m pip install -e ".[dev]"`.
 Argon's high preset needs `google-genai>=2.30.1` for automatic continuation above
