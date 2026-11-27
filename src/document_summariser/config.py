@@ -253,6 +253,34 @@ def apply_prompt_set(config: AppConfig, prompt_set: str | None) -> AppConfig:
             details={"config_file": str(config.source_path)},
         )
 
+    prompts = dict(config.prompts)
+    prompts.update(_prompt_set_paths(config, prompt_set))
+    updated = replace(config, prompts=prompts, selected_prompt_set=prompt_set)
+    validate_config(updated)
+    return updated
+
+
+def available_prompt_sets(config: AppConfig) -> list[str]:
+    """List the prompt sets that can be selected from this config."""
+    try:
+        entries = list(config.prompt_sets_dir.iterdir())
+    except (FileNotFoundError, NotADirectoryError):
+        return []
+
+    names = []
+    for entry in entries:
+        name = entry.name
+        if name != name.strip():
+            continue
+        try:
+            _prompt_set_paths(config, name)
+        except (ConfigError, OSError, RuntimeError):
+            continue
+        names.append(name)
+    return sorted(names)
+
+
+def _prompt_set_paths(config: AppConfig, prompt_set: str) -> dict[str, Path]:
     prompt_set_path = Path(prompt_set)
     if prompt_set_path.is_absolute() or prompt_set_path.name != prompt_set:
         raise ConfigError(
@@ -272,7 +300,7 @@ def apply_prompt_set(config: AppConfig, prompt_set: str | None) -> AppConfig:
         "summarise": selected_dir / "summarise.prompt.txt",
         "consolidate": selected_dir / "consolidate.prompt.txt",
     }
-    missing = [name for name, path in required.items() if not path.exists()]
+    missing = [name for name, path in required.items() if not path.is_file()]
     if missing:
         raise ConfigError(
             f"Prompt set {prompt_set!r} is missing required prompt file(s): {', '.join(missing)}",
@@ -284,11 +312,7 @@ def apply_prompt_set(config: AppConfig, prompt_set: str | None) -> AppConfig:
             },
         )
 
-    prompts = dict(config.prompts)
-    prompts.update(required)
-    updated = replace(config, prompts=prompts, selected_prompt_set=prompt_set)
-    validate_config(updated)
-    return updated
+    return required
 
 
 def resolve_model_name(config: AppConfig, name: str) -> str:

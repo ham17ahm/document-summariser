@@ -64,6 +64,12 @@ The installed `summarise` CLI also copies the final TXT to the configured final
 output folder by default. Use `--no-publish-final` only when you want run
 artifacts without that extra final TXT copy.
 
+Both `summarise` and `python summarise_pdf.py` show the available `-p` prompt
+sets and `-m` model aliases and provider IDs at startup. Run either command
+with `--help` or without a PDF to see the list without processing a document.
+The list is refreshed on every invocation and reflects the active config,
+including when you pass `--config`.
+
 Optional output directory:
 
 ```bash

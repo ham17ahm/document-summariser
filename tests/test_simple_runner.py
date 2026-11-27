@@ -3,6 +3,16 @@ from pathlib import Path
 from summarise_pdf import main
 
 
+def test_simple_runner_lists_options_without_pdf(tmp_path, capsys):
+    config = _write_mock_config(tmp_path)
+
+    assert main(["--config", str(config)]) == 0
+    out = capsys.readouterr().out
+    assert "Prompt sets (-p)" in out
+    assert "Provider IDs (-m)" in out
+    assert "claude, deepseek, gemini, gpt" in out
+
+
 def test_simple_runner_writes_text_next_to_pdf(tmp_path, monkeypatch):
     pdf = tmp_path / "sample.pdf"
     pdf.write_bytes(b"%PDF-1.7\n% placeholder\n")

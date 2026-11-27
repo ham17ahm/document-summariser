@@ -6,16 +6,18 @@ import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from textwrap import fill
 
 from document_summariser.application import SummaryRunResult, run_document_summary
-from document_summariser.config import preferred_config_path
+from document_summariser.config import AppConfig, available_prompt_sets, load_config, preferred_config_path
 from document_summariser.env import load_local_env
-from document_summariser.errors import print_cli_error
+from document_summariser.errors import print_cli_error, redact
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="summarise")
-    parser.add_argument("pdf", nargs="+", help="Path to one or more PDFs to summarise.")
+    parser = argparse.ArgumentParser(prog="summarise", add_help=False)
+    parser.add_argument("-h", "--help", action="store_true", help="Show help and available options.")
+    parser.add_argument("pdf", nargs="*", help="Path to one or more PDFs to summarise.")
     parser.add_argument(
         "--config",
         default=os.environ.get("DOCUMENT_SUMMARISER_CONFIG") or str(preferred_config_path()),
@@ -34,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Model for the consolidation step: a short name from model_aliases in the "
-            "config (e.g. argon, carbon) or a provider name. Defaults to pipeline.consolidator."
+            "config or a provider ID. Defaults to pipeline.consolidator."
         ),
     )
     parser.add_argument(
@@ -75,12 +77,31 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     try:
         load_local_env()
-        args = build_parser().parse_args(argv)
+        parser = build_parser()
+        args = parser.parse_args(argv)
     except Exception as exc:  # noqa: BLE001
         debug = "--debug-errors" in (argv or sys.argv[1:])
         return print_cli_error(exc, sys.stderr, debug=debug)
 
     debug: bool = args.debug_errors
+    show_help = args.help or not args.pdf
+    if show_help:
+        parser.print_help()
+    elif len(args.pdf) > 1 and args.final_text:
+        print("Error: --final-text cannot be used with multiple input PDFs.", file=sys.stderr)
+        return 1
+
+    try:
+        options = _format_available_options(load_config(args.config))
+    except Exception as exc:  # noqa: BLE001 - use the CLI error renderer for config failures
+        exit_code = print_cli_error(exc, sys.stderr, debug=debug)
+        return 0 if show_help else exit_code
+
+    if show_help:
+        print(f"\n{options}")
+        return 0
+
+    print(options, file=sys.stderr)
 
     if len(args.pdf) == 1:
         try:
@@ -102,10 +123,6 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:  # noqa: BLE001 - CLI boundary must render all runtime failures
             return print_cli_error(exc, sys.stderr, debug=debug)
 
-    if args.final_text:
-        print("Error: --final-text cannot be used with multiple input PDFs.", file=sys.stderr)
-        return 1
-
     return _run_concurrent(
         args.pdf,
         args.config,
@@ -116,6 +133,32 @@ def main(argv: list[str] | None = None) -> int:
         args.prompt_set,
         args.model,
     )
+
+
+def _format_available_options(config: AppConfig) -> str:
+    try:
+        prompt_sets = ", ".join(available_prompt_sets(config)) or "none"
+    except OSError:
+        prompt_sets = "unavailable (could not read the prompt sets directory)"
+
+    rows = {
+        "Prompt sets (-p)": prompt_sets,
+        "Model aliases (-m)": ", ".join(sorted(config.model_aliases)) or "none",
+        "Provider IDs (-m)": ", ".join(sorted(key for key in config.providers if isinstance(key, str))),
+        "Default model": config.consolidator,
+    }
+    lines = ["Available options"]
+    for label, value in rows.items():
+        indent = f"  {label:<21}"
+        lines.append(fill(
+            redact(value),
+            width=80,
+            initial_indent=indent,
+            subsequent_indent=" " * len(indent),
+            break_long_words=False,
+            break_on_hyphens=False,
+        ))
+    return "\n".join(lines)
 
 
 def _run_concurrent(

@@ -1,7 +1,20 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import yaml
+
 from document_summariser.cli import _print_quality_summary, build_parser, main
+from document_summariser.config import default_config_path
+
+
+def _write_discovery_config(tmp_path):
+    template = default_config_path()
+    config = yaml.safe_load(template.read_text(encoding="utf-8"))
+    config["prompts"] = {name: str(template.parent / path) for name, path in config["prompts"].items()}
+    config["prompt_sets"] = {"directory": str(tmp_path / "sets")}
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    return path, config
 
 
 def test_parser_caps_multi_pdf_parallelism_by_default():
@@ -36,6 +49,51 @@ def test_parser_accepts_model_aliases():
     assert short_args.model == "carbon"
 
 
+def test_help_uses_current_prompt_folders_and_model_config(tmp_path, monkeypatch, capsys):
+    config_path, config = _write_discovery_config(tmp_path)
+    monkeypatch.setenv("DOCUMENT_SUMMARISER_CONFIG", str(tmp_path / "unused.yaml"))
+
+    complete = tmp_path / "sets" / "complete-set"
+    complete.mkdir(parents=True)
+    (complete / "summarise.prompt.txt").touch()
+    (complete / "consolidate.prompt.txt").touch()
+    incomplete = tmp_path / "sets" / "incomplete-set"
+    incomplete.mkdir()
+    (incomplete / "summarise.prompt.txt").touch()
+    (incomplete / "consolidate.prompt.txt").mkdir()
+
+    assert main(["--help", "--config", str(config_path)]) == 0
+    out = capsys.readouterr().out
+    assert "complete-set" in out
+    assert "incomplete-set" not in out
+    assert "argonhigh" in out
+    assert "gemini_argon_high" in out
+
+    complete.rename(complete.with_name("new-set"))
+    config["model_aliases"] = {"new-alias": "new-provider"}
+    config["providers"]["new-provider"] = {"type": "mock", "model": "test-model"}
+    config["pipeline"]["consolidator"] = "new-provider"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    monkeypatch.setenv("DOCUMENT_SUMMARISER_CONFIG", str(config_path))
+
+    assert main([]) == 0
+    captured = capsys.readouterr()
+    assert "Prompt sets (-p)" in captured.out and "new-set" in captured.out
+    assert "Model aliases (-m)" in captured.out and "new-alias" in captured.out
+    assert "Provider IDs (-m)" in captured.out and "new-provider" in captured.out
+    assert "Default model" in captured.out
+    assert "complete-set" not in captured.out
+    assert "argonhigh" not in captured.out
+    assert captured.err == ""
+
+
+def test_help_still_shows_usage_with_unreadable_config(tmp_path, capsys):
+    assert main(["--config", str(tmp_path / "missing.yaml"), "-h"]) == 0
+    captured = capsys.readouterr()
+    assert "usage: summarise" in captured.out
+    assert "Could not read config file" in captured.err
+
+
 def test_final_text_rejected_for_multiple_pdfs(capsys):
     exit_code = main(["a.pdf", "b.pdf", "--final-text", "out.txt"])
 
@@ -46,6 +104,7 @@ def test_final_text_rejected_for_multiple_pdfs(capsys):
 def test_publish_final_supported_for_multiple_pdfs(tmp_path, monkeypatch, capsys):
     seen_prompt_sets = []
     seen_models = []
+    config_path, _ = _write_discovery_config(tmp_path)
 
     def fake_run(pdf_path, config=None, output_dir=None, prompt_set=None, consolidator=None):
         seen_prompt_sets.append(prompt_set)
@@ -64,19 +123,21 @@ def test_publish_final_supported_for_multiple_pdfs(tmp_path, monkeypatch, capsys
 
     monkeypatch.setattr("document_summariser.cli.run_document_summary", fake_run)
 
-    exit_code = main(["a.pdf", "b.pdf", "--prompt-set", "pr1", "-m", "carbon"])
+    exit_code = main(["a.pdf", "b.pdf", "--config", str(config_path), "--prompt-set", "pr1", "-m", "carbon"])
 
     assert exit_code == 0
     assert seen_prompt_sets == ["pr1", "pr1"]
     assert seen_models == ["carbon", "carbon"]
     assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "summary of a"
     assert (tmp_path / "b.txt").read_text(encoding="utf-8") == "summary of b"
-    out = capsys.readouterr().out
-    assert "[a.pdf]" in out and "[b.pdf]" in out
+    captured = capsys.readouterr()
+    assert "[a.pdf]" in captured.out and "[b.pdf]" in captured.out
+    assert captured.err.count("Available options") == 1
 
 
 def test_single_pdf_forwards_prompt_set(tmp_path, monkeypatch, capsys):
     seen = {}
+    config_path, _ = _write_discovery_config(tmp_path)
 
     def fake_run(pdf_path, config_path=None, output_dir=None, prompt_set=None, consolidator=None):
         text_path = tmp_path / "runs" / "summary.txt"
@@ -101,12 +162,12 @@ def test_single_pdf_forwards_prompt_set(tmp_path, monkeypatch, capsys):
 
     monkeypatch.setattr("document_summariser.cli.run_document_summary", fake_run)
 
-    exit_code = main(["a.pdf", "--config", "config.yaml", "--out", "runs", "-p", "pr2", "--model", "argon"])
+    exit_code = main(["a.pdf", "--config", str(config_path), "--out", "runs", "-p", "pr2", "--model", "argon"])
 
     assert exit_code == 0
     assert seen == {
         "pdf_path": "a.pdf",
-        "config_path": "config.yaml",
+        "config_path": str(config_path),
         "output_dir": "runs",
         "prompt_set": "pr2",
         "consolidator": "argon",

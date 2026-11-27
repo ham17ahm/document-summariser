@@ -48,6 +48,12 @@ Layout (reorganised 2026-11-13): `pipeline` (which provider ID does each job), `
 - Regression tests verify actual mock-provider output, saved manifests, unchanged earlier-stage artifacts, early failures, and single/batch CLI runs with prompt sets. Redundant cases were removed: the suite now has 84 passing tests, down from 104, while retaining the essential behavior checks.
 - Compile, CLI help, and whitespace checks passed. The one test warning is an existing Google GenAI SDK `_UnionGenericAlias` deprecation warning. No paid API pipeline was run; generated `pytest-tmp` and `__pycache__` directories were removed.
 
+## CLI Option Discovery
+
+- `summarise` and `python summarise_pdf.py` show available `-p` prompt sets, `-m` model aliases and provider IDs, and the default consolidation model. `--help` or running without a PDF shows the list without starting the pipeline.
+- The CLI reads the active config and scans `prompt_sets.directory` on each invocation. `--config` takes precedence over `DOCUMENT_SUMMARISER_CONFIG` and the default lookup. Only prompt sets with both required prompt files are listed.
+- PDF runs print the overview to stderr once per invocation, including for batches. Help prints the overview to stdout.
+
 ## Key Modules
 
 - `summarise_pdf.py`: simple runner that writes final `.txt` beside the input PDF.
@@ -104,7 +110,7 @@ summarise --help
 Expected current test result:
 
 ```text
-86 passed, 1 warning (verified 2026-11-19)
+89 passed, 1 warning (verified 2026-11-27)
 ```
 
 On this Windows/sandbox setup, pytest may need to run outside the sandbox because pytest-created temp directories can receive ACLs that the sandbox cannot scan. Clean `pytest-tmp/` after test runs if it remains.
